@@ -41,7 +41,7 @@ public class NotificationConfig {
     private String serverDescription = "A Hytale Server";
     
     // WebSocket server URL for sending player count data
-    private String wsServerURL = "wss://localhost:8080";
+    private String WSServerURL = "ws://localhost:8080";
     
     public NotificationConfig() {
         // Default constructor
@@ -214,11 +214,11 @@ public class NotificationConfig {
     }
     
     // WebSocket server URL getters/setters
-    public String getWsServerURL() {
-        return wsServerURL;
+    public String getWSServerURL() {
+        return WSServerURL;
     }
     
-    public void setWsServerURL(String wsServerURL) {
-        this.wsServerURL = wsServerURL;
+    public void setWSServerURL(String WSServerURL) {
+        this.WSServerURL = WSServerURL;
     }
 }

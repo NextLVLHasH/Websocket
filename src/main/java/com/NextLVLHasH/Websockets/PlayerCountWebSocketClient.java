@@ -5,6 +5,7 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
@@ -14,11 +15,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 /**
- * Optimized WebSocket client for sending player count data.
- * Sends a heartbeat pulse every 5 minutes instead of on every event.
- * Format: {"PlayerCount":"xx", "OnlineCount":"x"}
+ * WebSocket client for sending game server events to the WebSocket server.
+ * Sends player join/leave events immediately and periodic status updates.
+ * 
+ * Message formats:
+ * - playerJoin: {"type":"playerJoin","serverId":"hytale","playerName":"...","playerCount":X,"totalCount":X,"timestamp":...}
+ * - playerLeave: {"type":"playerLeave","serverId":"hytale","playerName":"...","playerCount":X,"totalCount":X,"timestamp":...}
+ * - serverStatus: {"type":"serverStatus","serverId":"hytale","online":true,"playerCount":X,"maxPlayers":X,"playerNames":[...],"version":"...","motd":"...","timestamp":...}
  */
 public class PlayerCountWebSocketClient implements WebSocket.Listener {
     private static final Logger LOGGER = Logger.getLogger(PlayerCountWebSocketClient.class.getName());
@@ -30,9 +36,18 @@ public class PlayerCountWebSocketClient implements WebSocket.Listener {
     private final AtomicBoolean connecting = new AtomicBoolean(false);
     private final ScheduledExecutorService scheduler;
     
+    // Server identification
+    private static final String SERVER_ID = "hytale";
+    
     // Track player counts
     private final AtomicInteger playerCount = new AtomicInteger(0);
-    private final AtomicInteger onlineCount = new AtomicInteger(0);
+    private final AtomicInteger totalCount = new AtomicInteger(0);
+    
+    // Server info for status updates
+    private String serverVersion = "1.0.0";
+    private String serverMotd = "Hytale Server";
+    private int maxPlayers = 100;
+    private volatile List<String> currentPlayerNames = List.of();
     
     // Pulse interval (5 minutes)
     private static final long PULSE_INTERVAL_MINUTES = 5;
@@ -129,28 +144,145 @@ public class PlayerCountWebSocketClient implements WebSocket.Listener {
     }
     
     /**
-     * Send a heartbeat pulse with current player counts
+     * Send a full server status update (heartbeat pulse)
      */
     private void sendPulse() {
+        sendServerStatus(true);
+    }
+    
+    /**
+     * Send a server status message
+     * @param online Whether the server is online
+     */
+    public void sendServerStatus(boolean online) {
         if (!connected.get() || webSocket == null) {
             return;
         }
         
+        String playerNamesJson = currentPlayerNames.stream()
+            .map(name -> "\"" + escapeJson(name) + "\"")
+            .collect(Collectors.joining(",", "[", "]"));
+        
         String json = String.format(
-            "{\"PlayerCount\":\"%d\",\"OnlineCount\":\"%d\",\"timestamp\":%d}",
+            "{\"type\":\"serverStatus\",\"serverId\":\"%s\",\"online\":%s,\"playerCount\":%d,\"maxPlayers\":%d,\"playerNames\":%s,\"version\":\"%s\",\"motd\":\"%s\",\"timestamp\":%d}",
+            SERVER_ID,
+            online,
             playerCount.get(),
-            onlineCount.get(),
+            maxPlayers,
+            playerNamesJson,
+            escapeJson(serverVersion),
+            escapeJson(serverMotd),
             System.currentTimeMillis()
         );
         
-        LOGGER.info("Sending pulse: " + json);
+        LOGGER.info("Sending serverStatus: " + json);
         
         webSocket.sendText(json, true)
             .exceptionally(ex -> {
-                LOGGER.warning("Failed to send pulse: " + ex.getMessage());
+                LOGGER.warning("Failed to send serverStatus: " + ex.getMessage());
                 handleDisconnect();
                 return null;
             });
+    }
+    
+    /**
+     * Send a player join event
+     * @param playerName The name of the player who joined
+     * @param currentPlayerCount Current number of online players
+     * @param totalPlayerCount Total player count
+     */
+    public void sendPlayerJoin(String playerName, int currentPlayerCount, int totalPlayerCount) {
+        this.playerCount.set(currentPlayerCount);
+        this.totalCount.set(totalPlayerCount);
+        
+        if (!connected.get() || webSocket == null) {
+            LOGGER.warning("Cannot send playerJoin - not connected");
+            return;
+        }
+        
+        String json = String.format(
+            "{\"type\":\"playerJoin\",\"serverId\":\"%s\",\"playerName\":\"%s\",\"playerCount\":%d,\"totalCount\":%d,\"timestamp\":%d}",
+            SERVER_ID,
+            escapeJson(playerName),
+            currentPlayerCount,
+            totalPlayerCount,
+            System.currentTimeMillis()
+        );
+        
+        LOGGER.info("Sending playerJoin: " + json);
+        
+        webSocket.sendText(json, true)
+            .exceptionally(ex -> {
+                LOGGER.warning("Failed to send playerJoin: " + ex.getMessage());
+                return null;
+            });
+    }
+    
+    /**
+     * Send a player leave event
+     * @param playerName The name of the player who left
+     * @param currentPlayerCount Current number of online players
+     * @param totalPlayerCount Total player count
+     */
+    public void sendPlayerLeave(String playerName, int currentPlayerCount, int totalPlayerCount) {
+        this.playerCount.set(currentPlayerCount);
+        this.totalCount.set(totalPlayerCount);
+        
+        if (!connected.get() || webSocket == null) {
+            LOGGER.warning("Cannot send playerLeave - not connected");
+            return;
+        }
+        
+        String json = String.format(
+            "{\"type\":\"playerLeave\",\"serverId\":\"%s\",\"playerName\":\"%s\",\"playerCount\":%d,\"totalCount\":%d,\"timestamp\":%d}",
+            SERVER_ID,
+            escapeJson(playerName),
+            currentPlayerCount,
+            totalPlayerCount,
+            System.currentTimeMillis()
+        );
+        
+        LOGGER.info("Sending playerLeave: " + json);
+        
+        webSocket.sendText(json, true)
+            .exceptionally(ex -> {
+                LOGGER.warning("Failed to send playerLeave: " + ex.getMessage());
+                return null;
+            });
+    }
+    
+    /**
+     * Escape special characters for JSON string
+     */
+    private String escapeJson(String value) {
+        if (value == null) return "";
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t");
+    }
+    
+    /**
+     * Update server information for status messages
+     * @param version Server version
+     * @param motd Server message of the day
+     * @param maxPlayers Maximum players allowed
+     */
+    public void setServerInfo(String version, String motd, int maxPlayers) {
+        this.serverVersion = version != null ? version : "1.0.0";
+        this.serverMotd = motd != null ? motd : "Hytale Server";
+        this.maxPlayers = maxPlayers > 0 ? maxPlayers : 100;
+    }
+    
+    /**
+     * Update the list of current player names
+     * @param playerNames List of online player names
+     */
+    public void updatePlayerNames(List<String> playerNames) {
+        this.currentPlayerNames = playerNames != null ? List.copyOf(playerNames) : List.of();
+        this.playerCount.set(this.currentPlayerNames.size());
     }
     
     /**
@@ -188,14 +320,14 @@ public class PlayerCountWebSocketClient implements WebSocket.Listener {
      * @param onlinePlayers Number of players currently online
      */
     public void updatePlayerCount(int totalPlayers, int onlinePlayers) {
-        this.playerCount.set(totalPlayers);
-        this.onlineCount.set(onlinePlayers);
+        this.playerCount.set(onlinePlayers);
+        this.totalCount.set(totalPlayers);
         // Just update the values - the pulse timer will send them
     }
     
     /**
      * Legacy method for backwards compatibility
-     * @deprecated Use updatePlayerCount instead
+     * @deprecated Use sendPlayerJoin/sendPlayerLeave instead
      */
     @Deprecated
     public void sendPlayerCount(int totalPlayers, int onlinePlayers) {
@@ -203,17 +335,26 @@ public class PlayerCountWebSocketClient implements WebSocket.Listener {
     }
     
     /**
-     * Force an immediate pulse (use sparingly - for server start/stop)
+     * Force an immediate status pulse (use sparingly - for server start/stop)
      */
     public void sendImmediatePulse(int totalPlayers, int onlinePlayers) {
-        this.playerCount.set(totalPlayers);
-        this.onlineCount.set(onlinePlayers);
+        this.playerCount.set(onlinePlayers);
+        this.totalCount.set(totalPlayers);
         
         if (connected.get()) {
-            sendPulse();
+            sendServerStatus(true);
         } else if (!connecting.get()) {
             // Try to connect first
             connect();
+        }
+    }
+    
+    /**
+     * Send server offline status (for shutdown)
+     */
+    public void sendServerOffline() {
+        if (connected.get()) {
+            sendServerStatus(false);
         }
     }
     

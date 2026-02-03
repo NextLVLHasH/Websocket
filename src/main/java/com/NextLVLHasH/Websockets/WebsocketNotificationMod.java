@@ -61,9 +61,9 @@ public class WebsocketNotificationMod extends JavaPlugin {
         getLogger().atInfo().log("Configuration loaded from: " + configManager.getConfigPath());
         
         // Initialize WebSocket client for player count data
-        if (config.getWsServerURL() != null && !config.getWsServerURL().isEmpty()) {
-            wsClient = new PlayerCountWebSocketClient(config.getWsServerURL());
-            wsClient.connect().thenRun(() -> getLogger().atInfo().log("WebSocket client connected to: " + config.getWsServerURL()));
+        if (config.getWSServerURL() != null && !config.getWSServerURL().isEmpty()) {
+            wsClient = new PlayerCountWebSocketClient(config.getWSServerURL());
+            wsClient.connect().thenRun(() -> getLogger().atInfo().log("WebSocket client connected to: " + config.getWSServerURL()));
         } else {
             getLogger().atWarning().log("WebSocket server URL not configured, player count data will not be sent");
         }
@@ -205,9 +205,10 @@ public class WebsocketNotificationMod extends JavaPlugin {
                         }
                     }
                     
-                    // Update player count for WebSocket (will be sent on next 5-min pulse)
+                    // Send playerJoin event to WebSocket server immediately
                     if (wsClient != null) {
-                        wsClient.updatePlayerCount(onlinePlayers.size(), onlinePlayers.size());
+                        wsClient.updatePlayerNames(getOnlinePlayerNames());
+                        wsClient.sendPlayerJoin(playerName, onlinePlayers.size(), onlinePlayers.size());
                     }
                     
                 } catch (Exception e) {
@@ -256,9 +257,10 @@ public class WebsocketNotificationMod extends JavaPlugin {
                         discordBot.sendPlayerLeaveNotification(playerName, onlinePlayers.size());
                     }
                     
-                    // Update player count for WebSocket (will be sent on next 5-min pulse)
+                    // Send playerLeave event to WebSocket server immediately
                     if (wsClient != null) {
-                        wsClient.updatePlayerCount(onlinePlayers.size(), onlinePlayers.size());
+                        wsClient.updatePlayerNames(getOnlinePlayerNames());
+                        wsClient.sendPlayerLeave(playerName, onlinePlayers.size(), onlinePlayers.size());
                     }
                     
                 } catch (Exception e) {
@@ -363,8 +365,15 @@ public class WebsocketNotificationMod extends JavaPlugin {
     protected void shutdown() {
         getLogger().atInfo().log("Discord Bot Notification Mod - Shutting down...");
         
-        // Disconnect WebSocket client
+        // Send server offline status and disconnect WebSocket client
         if (wsClient != null) {
+            wsClient.sendServerOffline();
+            // Give time for message to send
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             wsClient.disconnect();
         }
         
@@ -429,6 +438,16 @@ public class WebsocketNotificationMod extends JavaPlugin {
         getLogger().atInfo().log("Reloading configuration...");
         config = configManager.reloadConfig();
         getLogger().atInfo().log("Configuration reloaded successfully");
+    }
+    
+    /**
+     * Get list of online player names for WebSocket status updates
+     * @return List of player usernames currently online
+     */
+    private java.util.List<String> getOnlinePlayerNames() {
+        return onlinePlayers.values().stream()
+            .map(PlayerRef::getUsername)
+            .collect(java.util.stream.Collectors.toList());
     }
     
 }
