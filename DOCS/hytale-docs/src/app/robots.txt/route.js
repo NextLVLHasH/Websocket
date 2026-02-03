@@ -1,0 +1,23 @@
+function getSiteUrl() {
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    'http://localhost:3000'
+  return raw.replace(/\/+$/, '')
+}
+
+export async function GET() {
+  const siteUrl = getSiteUrl()
+  const body = [
+    'User-agent: *',
+    'Allow: /',
+    '',
+    `Sitemap: ${siteUrl}/sitemap.xml`
+  ].join('\n')
+
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'text/plain'
+    }
+  })
+}

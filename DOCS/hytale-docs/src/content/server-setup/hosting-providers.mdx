@@ -1,0 +1,257 @@
+# Hosting Providers
+
+Community-recommended hosting providers for Hytale servers, based on Discord discussions.
+
+## Managed Hytale Hosting
+
+### Nitrado
+- **Official Hytale Partner**: Mentioned in community discussions
+- **Features**:
+  - Hytale-specific hosting packages
+  - Recommended JDK: Eclipse Temurin 25
+  - Performance optimization tools (PerformanceSaver plugin)
+  - Achieved 1.8GB idle RAM with aggressive GC
+- **Region**: Multiple locations
+- **Website**: nitrado.net
+
+## VPS & Dedicated Servers
+
+### Europe
+
+#### Hetzner
+- **Popular choice** in the community
+- **Pricing**: Competitive rates
+- **Performance**: High-quality hardware
+- **Locations**: Germany, Finland
+- **Community Rating**: Highly recommended
+
+#### Netcup
+- **Pricing**: Budget-friendly
+- **Locations**: Germany, Austria
+- **Community Mention**: Good value for EU hosting
+
+#### Webdock
+- **Features**: SSD storage, good performance
+- **Locations**: Europe
+- **Community Mention**: Recommended for EU servers
+
+### United States
+
+#### OVH
+- **Pricing**: $4.20/month VPS with 8GB RAM (mentioned in Discord)
+- **Performance**: Solid mid-range option
+- **Locations**: US, Canada
+- **Community Rating**: Good budget choice
+
+#### AdvinServers
+- **Hardware**: Ryzen 9950X mentioned
+- **Performance**: High-end hardware
+- **Community Mention**: Performance-focused hosting
+
+#### Vultr
+- **Features**: Hourly billing, multiple locations
+- **Pricing**: Flexible plans
+- **Locations**: Global
+- **Community Rating**: Reliable VPS provider
+
+## DIY VPS Setup
+
+### Recommended Specifications
+
+Based on community testing:
+
+**Small Server (1-10 players)**
+- 4GB RAM
+- 2 CPU cores
+- 20GB SSD
+
+**Medium Server (10-30 players)**
+- 8GB RAM
+- 4 CPU cores
+- 40GB SSD
+
+**Large Server (30-70 players)**
+- 12GB+ RAM
+- 6+ CPU cores
+- 80GB+ SSD
+
+**Important Note**: Performance varies greatly based on:
+- World generation/exploration
+- Player spread (exploring vs staying together)
+- Number of active plugins
+- Chunk loading/caching
+
+## VPS Setup Steps
+
+### 1. Choose a Provider
+Select from the list above based on your location and budget.
+
+### 2. Select Server Specs
+Refer to the specifications above. Start small and scale up as needed.
+
+### 3. Operating System
+**Recommended**: Ubuntu 22.04 LTS or 24.04 LTS
+
+### 4. Initial Server Setup
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Java
+sudo apt install openjdk-21-jdk -y
+
+# Create Hytale user
+sudo useradd -m -d /opt/hytale -s /bin/bash hytale
+
+# Configure firewall
+sudo ufw allow 22/tcp  # SSH
+sudo ufw allow 5520/tcp  # Hytale
+sudo ufw enable
+```
+
+### 5. Install Server
+```bash
+# Switch to hytale user
+sudo su - hytale
+
+# Download server JAR
+wget <server-jar-url>
+
+# Create start script
+nano start.sh
+```
+
+Example start script:
+```bash
+#!/bin/bash
+java -Xms2G -Xmx8G -jar hytale-server.jar
+```
+
+### 6. Setup Systemd Service (Optional)
+```bash
+sudo nano /etc/systemd/system/hytale.service
+```
+
+```ini
+[Unit]
+Description=Hytale Server
+After=network.target
+
+[Service]
+Type=simple
+User=hytale
+WorkingDirectory=/opt/hytale
+ExecStart=/usr/bin/java -Xms2G -Xmx8G -jar hytale-server.jar
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+```bash
+sudo systemctl enable hytale
+sudo systemctl start hytale
+```
+
+## Docker Setup
+
+The community expects Docker support immediately:
+
+```dockerfile
+# Example Dockerfile (community expected)
+FROM openjdk:21-jdk-slim
+
+WORKDIR /app
+
+COPY hytale-server.jar .
+
+EXPOSE 5520
+
+CMD ["java", "-Xms2G", "-Xmx8G", "-jar", "hytale-server.jar"]
+```
+
+## Pterodactyl Panel
+
+From Discord:
+> "Pterodactyl egg expected within hours of release" - Community consensus
+
+Pterodactyl is a popular game server management panel. The community will likely create eggs (configurations) for Hytale very quickly.
+
+## Performance Considerations
+
+### Storage Type
+- **SSD**: Minimum requirement
+- **NVMe**: Recommended for large servers
+- **HDD**: NOT recommended
+
+### Network
+- **Bandwidth**: 100Mbps+ recommended
+- **Latency**: Choose location close to your player base
+- **DDoS Protection**: Essential for public servers
+
+### CPU
+- **Single-core performance**: Important for main server thread
+- **Multi-core**: Beneficial for multi-world servers
+- **Recommended**: Modern Ryzen or Intel Core processors
+
+## Cost Estimates
+
+Based on community discussions:
+
+**Budget Setup**: $5-15/month
+- Small VPS
+- 1-10 players
+- Basic performance
+
+**Mid-Range Setup**: $20-50/month
+- Good VPS or managed hosting
+- 10-30 players
+- Solid performance
+
+**High-End Setup**: $50-150+/month
+- Dedicated server or powerful VPS
+- 30-100+ players
+- Maximum performance
+
+## Hosting Comparison
+
+| Provider | Type | Region | Price Range | Community Rating |
+|----------|------|--------|-------------|------------------|
+| Nitrado | Managed | Global | $$ | Official Partner |
+| Hetzner | VPS | EU | $ | Highly Recommended |
+| OVH | VPS | US/EU | $ | Good Value |
+| Vultr | VPS | Global | $$ | Reliable |
+| AdvinServers | Managed | US | $$$ | High Performance |
+
+## Community Tips
+
+> "Pre-generate your worlds before opening to players - exploration is the biggest RAM consumer." - Performance testing
+
+> "If you're behind CGNAT, you'll need a VPS - home hosting won't work." - Networking discussion
+
+> "Start small and scale up. It's easier to upgrade than to downgrade." - Hosting advice
+
+> "Don't cheap out on CPU - single-core performance matters for the main thread." - Performance discussion
+
+## Backup Solutions
+
+### Important for Any Hosting:
+
+**Automated Backups**:
+```bash
+# Example backup script
+#!/bin/bash
+tar -czf /backups/hytale-$(date +%Y%m%d-%H%M%S).tar.gz /opt/hytale/
+```
+
+**Off-site Backups**:
+- Use rsync to remote server
+- Cloud storage (S3, Backblaze B2)
+- Regular backup schedule (daily minimum)
+
+## Next Steps
+
+- [Performance Tuning](/server-setup/performance-tuning) - Optimize your server
+- [Port Forwarding](/server-setup/port-forwarding) - Network configuration
+- [Configuration](/server-setup/configuration) - Server settings

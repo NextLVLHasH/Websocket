@@ -1,0 +1,393 @@
+# Player Data & Entity Management
+
+Learn how to access and manipulate player data using Hytale's ECS architecture.
+
+## Overview
+
+Hytale uses an Entity Component System (ECS) architecture for managing game objects, including players. Understanding how to work with entities and components is essential for plugin development.
+
+## Accessing Player Data in Events
+
+### Common Pattern
+
+Based on community discoveries from decompiling the server:
+
+```java
+// Get player reference from event
+Ref<EntityStore> entityRef = event.getPlayerRef();
+
+// Get the store
+Store<EntityStore> store = entityRef.getStore();
+
+// Get player component
+Player player = store.getComponent(entityRef, Player.getComponentType());
+
+// Get player UUID
+UUID uuid = playerRef.getHolder()
+    .getComponent(PlayerRef.getComponentType())
+    .getUuid();
+```
+
+### Example: Player Join Event
+
+```java
+public void onPlayerJoin(PlayerJoinEvent event) {
+    Ref<EntityStore> playerRef = event.getPlayerRef();
+    Store<EntityStore> store = playerRef.getStore();
+
+    Player player = store.getComponent(playerRef, Player.getComponentType());
+
+    // Send welcome message
+    player.sendMessage("Welcome to the server!");
+}
+```
+
+## Entity Component System (ECS)
+
+### What is ECS?
+
+ECS is a design pattern that separates:
+- **Entities**: Unique identifiers (IDs)
+- **Components**: Data containers
+- **Systems**: Logic that operates on entities with specific components
+
+### Benefits
+- Better performance (cache-friendly)
+- More flexible than inheritance
+- Easier to add/remove behaviors
+- Thread-safe operations
+
+### Hytale's Implementation
+
+From Discord discussions:
+> "ECS architecture mentioned but not fully implemented" - Community analysis
+
+The server uses ECS patterns, particularly for entity management, but may not be a pure ECS system throughout.
+
+## Component Types
+
+### Player Component
+Represents player-specific data:
+```java
+Player player = store.getComponent(entityRef, Player.getComponentType());
+```
+
+### Common Operations
+```java
+// Send message
+player.sendMessage("Hello!");
+
+// Get player name
+String name = player.getName();
+
+// Teleport player
+player.teleport(location);
+
+// Check permissions
+boolean hasPerm = player.hasPermission("my.permission");
+```
+
+## Entity References
+
+### Ref\<EntityStore\>
+A reference to an entity in the entity store:
+```java
+Ref<EntityStore> entityRef = event.getPlayerRef();
+```
+
+### Store\<EntityStore\>
+The entity store that holds all components:
+```java
+Store<EntityStore> store = entityRef.getStore();
+```
+
+## Working with Components
+
+### Getting Components
+```java
+// Get specific component
+ComponentType<Player> playerType = Player.getComponentType();
+Player player = store.getComponent(entityRef, playerType);
+
+// Check if entity has component
+boolean hasComponent = store.hasComponent(entityRef, playerType);
+```
+
+### Setting Components (Advanced)
+```java
+// Add or update component
+store.setComponent(entityRef, component);
+
+// Remove component
+store.removeComponent(entityRef, componentType);
+```
+
+## Player Management
+
+### Finding Players
+
+```java
+// Get online player by name
+Player player = server.getPlayer("PlayerName");
+
+// Get online player by UUID
+Player player = server.getPlayer(uuid);
+
+// Get all online players
+Collection<Player> players = server.getOnlinePlayers();
+```
+
+### Account Identity & External Auth
+
+Community notes:
+- No public OAuth flow or username-to-UUID lookup has been shared yet.
+- Usernames can change, so store the UUID for long-term identity.
+
+Common workaround for web apps:
+1. Player logs into your server.
+2. Plugin generates a short-lived code and shows it in-game.
+3. Player enters the code on your website to link their UUID.
+
+### Player Data
+
+```java
+// Player information
+UUID uuid = player.getUuid();
+String name = player.getName();
+Location location = player.getLocation();
+
+// Player state
+boolean isOnline = player.isOnline();
+GameMode gameMode = player.getGameMode();
+int health = player.getHealth();
+```
+
+## Data Persistence
+
+### Options for Storing Data
+
+From Discord discussions:
+
+**1. Server's Component System**
+- Store data as components on entities
+- Persists with world data
+
+**2. External Databases**
+- PostgreSQL with Spring Boot mentioned
+- MySQL, MongoDB, etc.
+- Better for cross-server data
+
+**3. File-Based Storage**
+- JSON, YAML configuration files
+- Simple key-value stores
+- Good for smaller datasets
+
+**4. NBT-Style Data**
+- Expected based on Minecraft heritage
+- Structured binary data format
+
+### Example: Simple Data Storage
+
+```java
+// Using configuration file
+public class PlayerDataManager {
+    private Map<UUID, PlayerData> playerData = new HashMap<>();
+
+    public void savePlayerData(UUID uuid, PlayerData data) {
+        playerData.put(uuid, data);
+        // Write to file
+        saveToFile();
+    }
+
+    public PlayerData getPlayerData(UUID uuid) {
+        return playerData.getOrDefault(uuid, new PlayerData());
+    }
+}
+```
+
+## Entity Manipulation
+
+### Creating Entities
+
+```java
+// Spawn entity at location
+Entity entity = world.spawnEntity(entityType, location);
+
+// Add components to entity
+store.setComponent(entityRef, customComponent);
+```
+
+### Modifying Entities
+
+```java
+// Get entity reference
+Ref<EntityStore> entityRef = entity.getEntityRef();
+
+// Modify components
+HealthComponent health = store.getComponent(entityRef, HealthComponent.getComponentType());
+health.setHealth(20);
+store.setComponent(entityRef, health);
+```
+
+### Removing Entities
+
+```java
+// Remove entity from world
+entity.remove();
+
+// Or through store
+world.removeEntity(entityRef);
+```
+
+## Common Patterns
+
+### Player Tracking
+
+```java
+public class PlayerTracker {
+    private Map<UUID, PlayerSession> sessions = new ConcurrentHashMap<>();
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        Player player = getPlayer(event);
+        sessions.put(player.getUuid(), new PlayerSession(player));
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        Player player = getPlayer(event);
+        sessions.remove(player.getUuid());
+    }
+
+    private Player getPlayer(PlayerEvent event) {
+        Ref<EntityStore> ref = event.getPlayerRef();
+        Store<EntityStore> store = ref.getStore();
+        return store.getComponent(ref, Player.getComponentType());
+    }
+}
+```
+
+### Custom Player Data
+
+```java
+public class CustomPlayerComponent {
+    private int kills;
+    private int deaths;
+    private long playtime;
+
+    // Getters and setters
+
+    public double getKDRatio() {
+        return deaths == 0 ? kills : (double) kills / deaths;
+    }
+}
+
+// Attach to player
+store.setComponent(playerRef, new CustomPlayerComponent());
+
+// Retrieve later
+CustomPlayerComponent data = store.getComponent(
+    playerRef,
+    CustomPlayerComponent.getComponentType()
+);
+```
+
+## Thread Safety
+
+### Important Considerations
+
+Each world runs on its own thread:
+- Be careful with shared state
+- Use thread-safe collections (ConcurrentHashMap, CopyOnWriteArrayList)
+- Synchronize when necessary
+
+```java
+// Thread-safe player data storage
+private final ConcurrentHashMap<UUID, PlayerData> playerData =
+    new ConcurrentHashMap<>();
+
+// Atomic operations
+playerData.compute(uuid, (k, v) -> {
+    if (v == null) v = new PlayerData();
+    v.incrementKills();
+    return v;
+});
+```
+
+## Best Practices
+
+### Performance
+- Cache frequently accessed components
+- Avoid getting components in tight loops
+- Use bulk operations when possible
+
+### Code Organization
+```java
+// Good: Dedicated data access layer
+public class PlayerDataAccess {
+    private final Store<EntityStore> store;
+
+    public Player getPlayer(Ref<EntityStore> ref) {
+        return store.getComponent(ref, Player.getComponentType());
+    }
+
+    public UUID getUuid(Ref<EntityStore> ref) {
+        return getPlayer(ref).getUuid();
+    }
+}
+```
+
+### Error Handling
+```java
+// Always check if component exists
+if (store.hasComponent(entityRef, Player.getComponentType())) {
+    Player player = store.getComponent(entityRef, Player.getComponentType());
+    // Safe to use player
+} else {
+    // Handle missing component
+}
+```
+
+## Community Tips
+
+> "The entity component system pattern discovered from decompiling the server JAR" - Community research
+
+> "Each world runs on its own thread - be careful with concurrent access" - Architecture discussion
+
+> "Use ConcurrentHashMap for player data that spans multiple worlds" - Performance advice
+
+## Debugging
+
+### Common Issues
+
+**NullPointerException when accessing player**
+- Check if component exists first
+- Verify event is providing correct reference
+
+**Data not persisting**
+- Ensure you're saving to disk/database
+- Check file permissions
+- Verify serialization is working
+
+**Concurrent modification errors**
+- Use thread-safe collections
+- Synchronize shared state access
+
+### Logging
+
+```java
+// Debug entity references
+logger.info("Entity ref: " + entityRef);
+logger.info("Has player component: " +
+    store.hasComponent(entityRef, Player.getComponentType()));
+
+// Log player actions
+logger.info(player.getName() + " performed action");
+```
+
+## Next Steps
+
+- [Event System](/plugin-development/event-system) - Handle player events
+- [ECS Patterns](/plugin-development/ecs-patterns) - Deep dive into ECS
+- [Configuration](/plugin-development/configuration) - Store player data
+- [Examples](/plugin-development/examples) - See complete implementations

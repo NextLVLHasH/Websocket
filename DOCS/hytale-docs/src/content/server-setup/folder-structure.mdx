@@ -1,0 +1,31 @@
+# Server Folder Structure
+
+This page outlines a typical Hytale server directory layout. Exact names can vary by build and hosting provider, so treat this as a reference and adapt to your setup.
+
+## Example layout
+
+```
+hytale-server/
+├── Assets.zip           # Compressed content bundle
+├── run.sh               # Startup script (platform-specific)
+├── Server/              # Core server runtime and configs
+│   ├── auth.enc         # Auth data (do not edit)
+│   ├── bans.json        # Ban list
+│   ├── config.json      # Main server settings
+│   ├── config.json.bak  # Backup of main config
+│   ├── HytaleServer.jar # Server executable
+│   ├── imports/         # Imported resources/content
+│   ├── logs/            # Server logs and crash reports
+│   ├── mods/            # Server-side modules (mods/plugins)
+│   ├── permissions.json # Permissions and roles
+│   ├── universe/        # World data (one or more worlds)
+│   └── whitelist.json   # Whitelist entries
+```
+
+## Notes
+
+- `mods/` is where server-side modules live. Each module typically has its own subfolder for configs and data.
+- `config.json` is the primary server config; keep a backup before major changes.
+- `universe/` often includes multiple worlds or dimensions; back this up before major changes.
+- `logs/` helps with debugging; keep recent logs when reporting issues.
+- `Assets.zip` contains content bundles used by the server.

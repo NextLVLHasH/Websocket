@@ -1,0 +1,192 @@
+# Server Setup & Administration
+
+Learn how to set up, configure, and manage a Hytale server.
+
+## Overview
+
+Hytale servers run on Java and can be hosted on various platforms. The server JAR is available at launch, with source code to be released 1-2 months after Early Access.
+
+## Server Requirements
+
+Based on community testing and hosting provider information:
+
+### Minimum Requirements
+- **CPU**: Multi-core processor (4+ cores recommended)
+- **RAM**: 4GB minimum, 8GB+ recommended
+- **Storage**: SSD recommended for world data
+- **Network**: Stable connection with port 5520 open
+
+### Performance Notes from Community
+
+Real-world testing revealed:
+- ~12GB RAM for 70 players (community report)
+- 4 players exploring in different directions can strain 8GB servers
+- Nitrado achieved 1.8GB idle with aggressive garbage collection
+- Performance heavily depends on world generation and player activity
+
+## Server Architecture
+
+Key technical details from Discord discussions:
+
+- **Multi-threading**: Each world runs on its own thread
+- **Tick Rate**: 30 TPS (vs Minecraft's 20 TPS)
+- **Modular Design**: 70+ modules that can be disabled for performance
+- **Config Location**: `config.json` in world folders
+
+## Quick Start
+
+1. Download the Hytale server JAR
+2. Run: `java -jar hytale-server.jar`
+3. Configure `config.json`
+4. Open port 5520
+5. Start accepting connections
+
+## Server Configuration (config.json)
+
+Based on the decompiled `HytaleServerConfig.java`, here are the key configuration options:
+
+### Basic Settings
+
+```json
+{
+  "serverName": "My Hytale Server",
+  "motd": "Welcome to the server!",
+  "password": "",
+  "maxPlayers": 100,
+  "maxViewRadius": 32
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `serverName` | "Hytale Server" | Display name in server list |
+| `motd` | "" | Message of the day |
+| `password` | "" | Server password (empty = no password) |
+| `maxPlayers` | 100 | Maximum concurrent players |
+| `maxViewRadius` | 32 | Chunk render distance (lower = less RAM) |
+
+### Connection Timeouts
+
+```json
+{
+  "connectionTimeouts": {
+    "initial": "PT10S",
+    "auth": "PT30S",
+    "play": "PT1M"
+  }
+}
+```
+
+| Timeout | Default | Description |
+|---------|---------|-------------|
+| `initial` | 10 seconds | Initial connection timeout |
+| `auth` | 30 seconds | Authentication timeout |
+| `play` | 1 minute | Play session timeout |
+
+### Rate Limiting
+
+```json
+{
+  "rateLimitConfig": {
+    "packetsPerSecond": 2000,
+    "burstCapacity": 500
+  }
+}
+```
+
+### Module Configuration
+
+Disable unused modules for better performance:
+
+```json
+{
+  "modules": {
+    "weather": { "enabled": false },
+    "portals": { "enabled": false },
+    "parkour": { "enabled": false }
+  }
+}
+```
+
+### Mod/Plugin Configuration
+
+Enable or configure specific mods:
+
+```json
+{
+  "modConfig": {
+    "com.example:MyPlugin": {
+      "enabled": true,
+      "requiredVersion": ">=1.0.0"
+    }
+  }
+}
+```
+
+### Authentication Commands
+
+After starting your server, configure authentication:
+
+```bash
+# Use browser-based authentication
+/auth login browser
+
+# Persist credentials (encrypted storage)
+/auth persistence encrypted
+
+# For development only (not secure)
+/auth insecure
+```
+
+## Sections
+
+- [Port Forwarding](/server-setup/port-forwarding) - Network setup
+- [Folder Structure](/server-setup/folder-structure) - Server directory layout
+- [Networking & Transfer Packets](/server-setup/networking) - Multi-server architecture & DDoS protection
+- [Hosting Providers](/server-setup/hosting-providers) - Recommended hosts
+- [Performance Optimization](/server-setup/performance-optimization) - JVM tuning, memory management
+- [Multi-Server Architecture](/server-setup/multi-server) - Transfer packets, cross-server setup
+
+## No Proxy Required
+
+Hytale introduces **transfer packets** - a revolutionary feature that eliminates the need for proxy servers like BungeeCord or Velocity:
+
+> "We have a transfer packet with a 4KB payload which will allow you to add data when switching over to another server. There will be no need for BungeeCord-like proxies." - Slikey (Tech Director)
+
+This means:
+- **Simpler infrastructure** - No proxy servers to maintain
+- **Lower costs** - Fewer servers needed
+- **Direct connections** - Less latency
+- **Built-in state transfer** - 4KB payload per transfer
+
+Learn more in [Networking & Transfer Packets](/server-setup/networking).
+
+## Platform Support
+
+- **Windows**: Full support
+- **Linux**: Supported (Flatpak available)
+- **macOS**: Delayed due to Apple code signing requirements
+- **FreeBSD**: Community discussion, unofficial support
+
+## Server Types
+
+### Dedicated Server
+Run the server JAR on a dedicated machine or VPS for best performance.
+
+### Home Hosting
+Host on your personal computer - requires port forwarding and good internet connection.
+
+### Managed Hosting
+Use a hosting provider that manages the infrastructure for you.
+
+## Community Wisdom
+
+> "Pre-generate your worlds before opening to players - exploration is the biggest RAM consumer." - Performance testing insights
+
+> "Each world is on its own thread, so multi-world servers benefit from multi-core CPUs." - Architecture discussion
+
+> "Don't rely on UPnP - manually configure port forwarding for reliability." - Networking advice
+
+## Next Steps
+
+Start with [Installation](/server-setup/installation) to get your server running, then move on to [Configuration](/server-setup/configuration) and [Performance Tuning](/server-setup/performance-tuning).

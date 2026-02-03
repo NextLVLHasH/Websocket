@@ -1,0 +1,393 @@
+# Advanced Permissions Guide
+
+This guide covers the permissions system in depth, including the `permissions.json` file structure and programmatic permission management.
+
+## permissions.json Structure
+
+The permissions file is located in your server's root directory.
+
+### Basic Structure
+
+```json
+{
+  "users": {
+    "uuid-here": {
+      "groups": ["Admin", "Default"]
+    },
+    "another-uuid": {
+      "groups": ["Moderator", "Default"]
+    }
+  },
+  "groups": {
+    "Default": [
+      "hytale.command.spawn.self",
+      "hytale.command.home"
+    ],
+    "Moderator": [
+      "hytale.command.kick",
+      "hytale.command.mute",
+      "hytale.command.teleport.other"
+    ],
+    "Admin": [
+      "*"
+    ]
+  }
+}
+```
+
+### Field Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `users` | Object | Map of player UUIDs to their settings |
+| `users.<uuid>.groups` | Array | List of group names the player belongs to |
+| `groups` | Object | Map of group names to permission arrays |
+| `groups.<name>` | Array | List of permission nodes for this group |
+
+### Wildcard Permissions
+
+```json
+{
+  "groups": {
+    "Admin": ["*"],                           // All permissions
+    "Moderator": ["hytale.command.*"],        // All hytale.command.* permissions
+    "Builder": ["myplugin.build.*"]           // All myplugin.build.* permissions
+  }
+}
+```
+
+### Permission Inheritance
+
+Groups don't automatically inherit from each other. To achieve inheritance, assign multiple groups:
+
+```json
+{
+  "users": {
+    "admin-uuid": {
+      "groups": ["Admin", "Moderator", "Default"]  // Has all three groups' permissions
+    }
+  }
+}
+```
+
+## Common Issue: File Reverting
+
+> "trying to set up permissions on my server but it keeps overriding them every launch" - Discord
+
+**Causes:**
+1. Syntax errors in JSON cause server to regenerate defaults
+2. File being overwritten by another process
+3. Incorrect file location
+
+**Solutions:**
+
+1. **Validate JSON syntax** using a JSON validator
+2. **Check file location** - must be in server root
+3. **Verify file permissions** - server must have write access
+4. **Stop server before editing** - edit while server is stopped
+
+```bash
+# Validate JSON syntax (Linux/macOS)
+cat permissions.json | jq .
+
+# Or use online validator
+```
+
+## Creating Custom Permission Nodes
+
+### In Your Plugin
+
+```java
+public class MyPlugin extends JavaPlugin {
+    // Define permission constants
+    public static final String PERM_USE = "myplugin.use";
+    public static final String PERM_ADMIN = "myplugin.admin";
+    public static final String PERM_TELEPORT = "myplugin.teleport";
+    public static final String PERM_TELEPORT_OTHER = "myplugin.teleport.other";
+
+    @Override
+    protected void setup() {
+        getCommandRegistry().registerCommand(new TeleportCommand());
+    }
+}
+```
+
+### In Commands
+
+```java
+public class TeleportCommand extends AbstractPlayerCommand {
+    public TeleportCommand() {
+        // Second parameter is the required permission
+        super("tp", MyPlugin.PERM_TELEPORT);
+    }
+
+    @Override
+    protected void execute(Ref<EntityStore> ref, Store<EntityStore> store, CommandContext context) {
+        Player player = store.getComponent(ref, Player.getComponentType());
+
+        // Check additional permission for teleporting others
+        if (context.hasArg("target")) {
+            if (!player.hasPermission(MyPlugin.PERM_TELEPORT_OTHER)) {
+                player.sendMessage(Message.raw("You don't have permission to teleport others!"));
+                return;
+            }
+            // teleport other player
+        } else {
+            // teleport self
+        }
+    }
+}
+```
+
+## Programmatic Permission Checks
+
+### Basic Check
+
+```java
+public void doAction(Player player) {
+    if (player.hasPermission("myplugin.action")) {
+        // Player has permission
+        performAction(player);
+    } else {
+        player.sendMessage(Message.raw("You don't have permission!"));
+    }
+}
+```
+
+### Multiple Permissions
+
+```java
+public void complexAction(Player player) {
+    // All required
+    if (player.hasPermission("myplugin.action") &&
+        player.hasPermission("myplugin.complex")) {
+        performComplexAction(player);
+    }
+
+    // Any of these
+    if (player.hasPermission("myplugin.admin") ||
+        player.hasPermission("myplugin.moderator")) {
+        performModAction(player);
+    }
+}
+```
+
+### In Events
+
+```java
+getEventRegistry().register(PlayerInteractEvent.class, event -> {
+    Player player = event.getPlayer();
+
+    if (!player.hasPermission("myplugin.interact")) {
+        event.setCancelled(true);
+        player.sendMessage(Message.raw("You can't interact with this!"));
+    }
+});
+```
+
+## Permission Naming Conventions
+
+Follow these conventions for consistency:
+
+```
+<plugin>.<category>.<action>[.<modifier>]
+
+Examples:
+- myplugin.command.spawn
+- myplugin.command.spawn.other
+- myplugin.feature.fly
+- myplugin.admin.reload
+- myplugin.bypass.cooldown
+```
+
+### Recommended Structure
+
+```
+myplugin.
+├── command.
+│   ├── help
+│   ├── spawn
+│   ├── spawn.other
+│   ├── home
+│   └── home.set
+├── feature.
+│   ├── fly
+│   ├── speed
+│   └── godmode
+├── admin.
+│   ├── reload
+│   ├── debug
+│   └── bypass
+└── bypass.
+    ├── cooldown
+    └── limit
+```
+
+## Dynamic Permission Assignment
+
+### Adding Permissions at Runtime
+
+```java
+public void grantVIP(Player player) {
+    // Implementation depends on your permission backend
+    // This is conceptual - actual API may vary
+    PermissionManager.addToGroup(player.getUUID(), "VIP");
+}
+```
+
+### Temporary Permissions
+
+```java
+public class TempPermissionManager {
+    private final Map<UUID, Map<String, Long>> tempPermissions = new ConcurrentHashMap<>();
+
+    public void grantTemp(Player player, String permission, Duration duration) {
+        long expiry = System.currentTimeMillis() + duration.toMillis();
+        tempPermissions
+            .computeIfAbsent(player.getUUID(), k -> new ConcurrentHashMap<>())
+            .put(permission, expiry);
+    }
+
+    public boolean hasTempPermission(Player player, String permission) {
+        Map<String, Long> playerPerms = tempPermissions.get(player.getUUID());
+        if (playerPerms == null) return false;
+
+        Long expiry = playerPerms.get(permission);
+        if (expiry == null) return false;
+
+        if (System.currentTimeMillis() > expiry) {
+            playerPerms.remove(permission);
+            return false;
+        }
+
+        return true;
+    }
+}
+
+// Usage
+tempManager.grantTemp(player, "myplugin.vip", Duration.ofHours(24));
+```
+
+## Group-Based Features
+
+### Rank Display
+
+```java
+public String getPlayerPrefix(Player player) {
+    if (player.hasPermission("rank.admin")) {
+        return "[Admin] ";
+    } else if (player.hasPermission("rank.moderator")) {
+        return "[Mod] ";
+    } else if (player.hasPermission("rank.vip")) {
+        return "[VIP] ";
+    }
+    return "";
+}
+
+// Usage in chat
+getEventRegistry().register(PlayerChatEvent.class, event -> {
+    String prefix = getPlayerPrefix(event.getPlayer());
+    event.setFormat(prefix + event.getPlayer().getName() + ": " + event.getMessage());
+});
+```
+
+### Feature Unlocking
+
+```java
+public class FeatureManager {
+    public boolean canUseFeature(Player player, String feature) {
+        return switch (feature) {
+            case "fly" -> player.hasPermission("features.fly");
+            case "speed" -> player.hasPermission("features.speed");
+            case "homes" -> player.hasPermission("features.homes");
+            default -> false;
+        };
+    }
+
+    public int getMaxHomes(Player player) {
+        if (player.hasPermission("homes.unlimited")) return Integer.MAX_VALUE;
+        if (player.hasPermission("homes.10")) return 10;
+        if (player.hasPermission("homes.5")) return 5;
+        return 1; // Default
+    }
+}
+```
+
+## Example permissions.json
+
+Complete example for a typical server:
+
+```json
+{
+  "users": {
+    "owner-uuid-here": {
+      "groups": ["Owner", "Admin", "Moderator", "VIP", "Default"]
+    },
+    "admin-uuid-here": {
+      "groups": ["Admin", "Moderator", "VIP", "Default"]
+    },
+    "mod-uuid-here": {
+      "groups": ["Moderator", "Default"]
+    },
+    "vip-uuid-here": {
+      "groups": ["VIP", "Default"]
+    }
+  },
+  "groups": {
+    "Default": [
+      "hytale.command.spawn",
+      "hytale.command.home",
+      "myplugin.command.help",
+      "myplugin.feature.basic"
+    ],
+    "VIP": [
+      "myplugin.feature.fly",
+      "myplugin.homes.5",
+      "myplugin.bypass.cooldown"
+    ],
+    "Moderator": [
+      "hytale.command.kick",
+      "hytale.command.mute",
+      "hytale.command.ban.temp",
+      "hytale.command.teleport",
+      "myplugin.admin.spectate"
+    ],
+    "Admin": [
+      "hytale.command.ban",
+      "hytale.command.unban",
+      "hytale.command.op",
+      "myplugin.admin.*"
+    ],
+    "Owner": [
+      "*"
+    ]
+  }
+}
+```
+
+## Troubleshooting
+
+### Permission Not Working
+
+1. **Check spelling** - Permission nodes are case-sensitive
+2. **Check player UUID** - Ensure correct UUID in permissions.json
+3. **Reload permissions** - Server may need restart
+4. **Check inheritance** - Ensure player has all required groups
+
+### Debugging Permissions
+
+```java
+public void debugPermissions(Player player, String permission) {
+    boolean has = player.hasPermission(permission);
+    getLogger().atInfo().log(
+        "Player " + player.getName() +
+        " permission '" + permission + "': " + has
+    );
+}
+```
+
+## Next Steps
+
+- [Permissions](/plugin-development/permissions) - Basic permissions overview
+- [Commands](/plugin-development/commands) - Adding permissions to commands
+- [Configuration](/plugin-development/configuration) - Storing permission config

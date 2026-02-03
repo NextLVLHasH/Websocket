@@ -1,0 +1,605 @@
+# Plugin Lifecycle
+
+Understanding the plugin lifecycle is crucial for proper initialization, operation, and cleanup of your Hytale plugins.
+
+## Lifecycle Methods
+
+Every Hytale plugin has three main lifecycle methods:
+
+```java
+public class MyPlugin extends JavaPlugin {
+    
+    @Override
+    protected void setup() {
+        // Called first - register everything
+    }
+    
+    @Override
+    protected void start() {
+        // Called after setup - initialize resources
+    }
+    
+    @Override
+    protected void shutdown() {
+        // Called on unload - cleanup
+    }
+}
+```
+
+## setup() Method
+
+Called **first** during plugin initialization. Use this to register:
+- Event listeners
+- Commands
+- ECS systems
+- Services
+
+```java
+@Override
+protected void setup() {
+    // Register events
+    getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onJoin);
+    getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, future -> {
+        future.thenAccept(this::onChat);
+    });
+    
+    // Register ECS systems
+    getEntityStoreRegistry().registerSystem(new BlockBreakSystem());
+    
+    // Register commands
+    getCommandRegistry().registerCommand(new SpawnCommand());
+    getCommandRegistry().registerCommand(new HomeCommand());
+    
+    // Register services
+    registerService(new EconomyService());
+}
+```
+
+**Best Practices:**
+- Register all listeners/commands here
+- Don't perform heavy initialization
+- Don't start threads yet
+- Don't load data yet
+
+## start() Method
+
+Called **after** setup() completes. Use this for:
+- Loading configuration
+- Initializing databases
+- Loading player data
+- Starting async tasks
+- Logging startup messages
+
+```java
+@Override
+protected void start() {
+    getLogger().atInfo().log("MyPlugin starting...");
+    
+    // Load configuration
+    loadConfig();
+    
+    // Initialize database
+    connectDatabase();
+    
+    // Load data
+    loadWarps();
+    loadHomes();
+    
+    // Start background tasks
+    startAutoSave();
+    
+    getLogger().atInfo().log("MyPlugin started successfully!");
+}
+```
+
+**Best Practices:**
+- Load configuration first
+- Initialize resources
+- Start scheduled tasks
+- Log startup completion
+
+## shutdown() Method
+
+Called when the plugin is unloaded or server stops. Use this for:
+- Saving data
+- Closing databases
+- Stopping threads
+- Removing registrations
+- Final cleanup
+
+```java
+@Override
+protected void shutdown() {
+    getLogger().atInfo().log("MyPlugin shutting down...");
+    
+    // Save all data
+    saveAllPlayerData();
+    saveWarps();
+    
+    // Stop scheduled tasks
+    stopAutoSave();
+    
+    // Close database
+    closeDatabase();
+    
+    // Cleanup resources
+    cleanup();
+    
+    getLogger().atInfo().log("MyPlugin shut down complete");
+}
+```
+
+**Best Practices:**
+- Save all data first
+- Stop all threads/tasks
+- Close all connections
+- Remove event registrations (usually automatic)
+- Log shutdown completion
+
+## Hot Reloading
+
+Proper lifecycle management enables hot-reloading during development:
+
+> "At the moment we're working on a 'HotPluginReload'... Simply to speed up feedback cycles when developing plugins." - Slikey
+
+> "Plugins have a setup, start, and shutdown function... if you use the shutdown function to 'clean up' after yourself... unloading and loading should just work." - Community member
+
+### Requirements for Hot Reload
+
+```java
+@Override
+protected void shutdown() {
+    // 1. Stop all threads
+    if (executorService != null) {
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+        }
+    }
+    
+    // 2. Close all connections
+    if (database != null) {
+        database.close();
+    }
+    
+    // 3. Clear caches
+    playerCache.clear();
+    
+    // 4. Save data
+    saveAll();
+    
+    // 5. Remove registrations (if manual)
+    // Usually automatic
+}
+```
+
+### HotPluginReload Plugin
+
+The HotPluginReload plugin watches for JAR changes and automatically:
+1. Unloads current plugin version
+2. Unloads dependent plugins
+3. Copies new JAR
+4. Reloads all plugins
+
+**Development Workflow:**
+```bash
+# 1. Build plugin
+./gradlew build
+
+# 2. Copy to server
+cp build/libs/MyPlugin.jar server/mods/
+
+# 3. HotPluginReload detects change and reloads automatically
+```
+
+## Complete Lifecycle Example
+
+```java
+public class MyPlugin extends JavaPlugin {
+    
+    // Services
+    private Database database;
+    private ConfigManager configManager;
+    private DataStore dataStore;
+    
+    // Scheduled tasks
+    private ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> autoSaveTask;
+    
+    // Data
+    private final Map<UUID, PlayerData> playerCache = new ConcurrentHashMap<>();
+    
+    @Override
+    protected void setup() {
+        getLogger().atInfo().log("Setting up MyPlugin...");
+        
+        // Register event listeners
+        getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onPlayerJoin);
+        getEventRegistry().register(PlayerDisconnectEvent.class, this::onPlayerLeave);
+        
+        // Register commands
+        getCommandRegistry().registerCommand(new SpawnCommand());
+        getCommandRegistry().registerCommand(new HomeCommand(this));
+        getCommandRegistry().registerCommand(new ReloadCommand(this));
+        
+        // Register ECS systems
+        getEntityStoreRegistry().registerSystem(new BlockBreakSystem());
+    }
+    
+    @Override
+    protected void start() {
+        getLogger().atInfo().log("Starting MyPlugin...");
+        
+        // Initialize config
+        configManager = new ConfigManager(getDataFolder());
+        configManager.loadConfig("config.yml");
+        
+        // Connect to database
+        database = new Database(getDatabaseConfig());
+        database.connect();
+        
+        // Initialize data store
+        dataStore = new DataStore(database);
+        
+        // Load warps, homes, etc.
+        loadData();
+        
+        // Start scheduled tasks
+        startScheduledTasks();
+        
+        getLogger().atInfo().log("MyPlugin started successfully!");
+    }
+    
+    @Override
+    protected void shutdown() {
+        getLogger().atInfo().log("Shutting down MyPlugin...");
+        
+        // Save all player data
+        playerCache.forEach((uuid, data) -> {
+            dataStore.savePlayerData(uuid, data);
+        });
+        
+        // Save warps, homes, etc.
+        saveData();
+        
+        // Stop scheduled tasks
+        if (autoSaveTask != null) {
+            autoSaveTask.cancel(false);
+        }
+        
+        if (scheduler != null) {
+            scheduler.shutdown();
+            try {
+                if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    scheduler.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                scheduler.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+        
+        // Close database
+        if (database != null) {
+            database.close();
+        }
+        
+        // Clear caches
+        playerCache.clear();
+        
+        getLogger().atInfo().log("MyPlugin shut down complete");
+    }
+    
+    private void startScheduledTasks() {
+        scheduler = Executors.newScheduledThreadPool(1);
+        
+        // Auto-save every 5 minutes
+        autoSaveTask = scheduler.scheduleAtFixedRate(
+            this::autoSave,
+            5,
+            5,
+            TimeUnit.MINUTES
+        );
+    }
+    
+    private void autoSave() {
+        getLogger().atInfo().log("Auto-saving...");
+        playerCache.forEach((uuid, data) -> {
+            dataStore.savePlayerData(uuid, data);
+        });
+        saveData();
+    }
+    
+    private void onPlayerJoin(PlayerReadyEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUuid();
+        
+        // Load player data
+        PlayerData data = dataStore.loadPlayerData(uuid);
+        playerCache.put(uuid, data);
+        
+        // Welcome message
+        player.sendMessage(Message.raw("Welcome back!"));
+    }
+    
+    private void onPlayerLeave(PlayerDisconnectEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUuid();
+        
+        // Save and remove from cache
+        PlayerData data = playerCache.remove(uuid);
+        if (data != null) {
+            dataStore.savePlayerData(uuid, data);
+        }
+    }
+    
+    public void reloadConfig() {
+        configManager.loadConfig("config.yml");
+        // Reload other data
+        getLogger().atInfo().log("Configuration reloaded");
+    }
+    
+    // Getters for other classes
+    public DataStore getDataStore() {
+        return dataStore;
+    }
+    
+    public Map<UUID, PlayerData> getPlayerCache() {
+        return playerCache;
+    }
+}
+```
+
+## Dependency Injection
+
+Access plugin instance from other classes:
+
+```java
+public class HomeCommand extends CommandBase {
+    private final MyPlugin plugin;
+    
+    public HomeCommand(MyPlugin plugin) {
+        this.plugin = plugin;
+    }
+    
+    @Override
+    public void execute(CommandSender sender, String[] args) {
+        // Access plugin services
+        DataStore dataStore = plugin.getDataStore();
+        PlayerData data = dataStore.loadPlayerData(uuid);
+    }
+}
+```
+
+## Available Registries
+
+Based on the decompiled source, these registries are available to plugins via the plugin base class:
+
+| Registry | Access Method | Purpose |
+|----------|---------------|---------|
+| `CommandRegistry` | `getCommandRegistry()` | Register custom commands |
+| `EventRegistry` | `getEventRegistry()` | Register event listeners |
+| `EntityRegistry` | `getEntityRegistry()` | Register custom entity types |
+| `BlockStateRegistry` | `getBlockStateRegistry()` | Register block state types |
+| `TaskRegistry` | `getTaskRegistry()` | Schedule async/delayed tasks |
+| `ClientFeatureRegistry` | `getClientFeatureRegistry()` | Register client-side features |
+| `CodecRegistry` | `getCodecRegistry(...)` | Register custom codecs |
+| `AssetRegistry` | `getAssetRegistry()` | Register custom assets |
+| `EntityStoreRegistry` | `getEntityStoreRegistry()` | Register ECS systems/components |
+
+**Example Usage:**
+```java
+@Override
+protected void setup() {
+    // Commands
+    getCommandRegistry().registerCommand(new MyCommand());
+
+    // Events
+    getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onJoin);
+
+    // ECS Systems
+    getEntityStoreRegistry().registerSystem(new BlockBreakSystem());
+
+    // Scheduled tasks
+    getTaskRegistry().scheduleRepeating(this::tick, 20, 20); // Every second
+}
+```
+
+## Plugin Data Directory
+
+Access your plugin's data folder for persistent storage:
+
+```java
+// Get plugin data directory
+Path dataDir = getDataDirectory();
+
+// Example: Save config
+Path configPath = dataDir.resolve("config.json");
+Files.writeString(configPath, jsonContent);
+```
+
+## Module Dependencies
+
+Plugins can depend on Hytale modules using the `Dependencies` field in manifest.json:
+
+**manifest.json:**
+```json
+{
+  "Group": "com.example",
+  "Name": "MyPlugin",
+  "Dependencies": {
+    "Hytale:DamageModule": "*",
+    "Hytale:FluidPlugin": "*"
+  }
+}
+```
+
+Required for certain features:
+- `DamageModule` - Death/damage events, combat systems
+- `FluidPlugin` - Fluid/water mechanics
+
+## Plugin States
+
+Based on the decompiled `PluginState` enum, plugins transition through these states:
+
+| State | Description |
+|-------|-------------|
+| `NONE` | Initial state, plugin discovered but not loaded |
+| `SETUP` | `setup()` method called, registering components |
+| `START` | `start()` method called, initializing resources |
+| `ENABLED` | Plugin fully operational and processing events |
+| `SHUTDOWN` | `shutdown()` method called, cleanup in progress |
+| `DISABLED` | Plugin fully unloaded and inactive |
+
+**Lifecycle Flow:**
+```
+NONE → SETUP → START → ENABLED → SHUTDOWN → DISABLED
+```
+
+**Get Current State:**
+```java
+PluginState state = getState();
+if (state == PluginState.ENABLED) {
+    // Plugin is running
+}
+```
+
+## Common Lifecycle Issues
+
+### Memory Leaks
+
+```java
+// ❌ BAD - Thread never stops
+@Override
+protected void start() {
+    new Thread(() -> {
+        while (true) {
+            // This runs forever
+        }
+    }).start();
+}
+
+// ✓ GOOD - Proper cleanup
+private volatile boolean running = true;
+private Thread myThread;
+
+@Override
+protected void start() {
+    myThread = new Thread(() -> {
+        while (running) {
+            // Work
+        }
+    });
+    myThread.start();
+}
+
+@Override
+protected void shutdown() {
+    running = false;
+    if (myThread != null) {
+        myThread.interrupt();
+    }
+}
+```
+
+### Database Connection Leaks
+
+```java
+// ❌ BAD - Connection never closed
+@Override
+protected void start() {
+    Connection conn = DriverManager.getConnection(url);
+    // Never closed
+}
+
+// ✓ GOOD - Closed in shutdown
+private Connection connection;
+
+@Override
+protected void start() {
+    connection = DriverManager.getConnection(url);
+}
+
+@Override
+protected void shutdown() {
+    if (connection != null) {
+        try {
+            connection.close();
+        } catch (SQLException e) {
+            getLogger().atSevere().log("Error closing connection", e);
+        }
+    }
+}
+```
+
+### Unsaved Data
+
+```java
+// ❌ BAD - Data lost on shutdown
+@Override
+protected void shutdown() {
+    // No saving
+}
+
+// ✓ GOOD - Save before shutdown
+@Override
+protected void shutdown() {
+    saveAllPlayerData();
+    saveWarps();
+    saveConfiguration();
+}
+```
+
+## Best Practices Summary
+
+### DO:
+- ✓ Register everything in setup()
+- ✓ Initialize resources in start()
+- ✓ Save everything in shutdown()
+- ✓ Stop all threads in shutdown()
+- ✓ Close all connections in shutdown()
+- ✓ Use proper thread management
+- ✓ Log lifecycle events
+- ✓ Handle exceptions gracefully
+
+### DON'T:
+- ✗ Start threads in setup()
+- ✗ Load data in setup()
+- ✗ Forget to stop threads
+- ✗ Forget to close connections
+- ✗ Skip saving data
+- ✗ Ignore exceptions
+- ✗ Block the main thread
+
+## Debugging Lifecycle
+
+```java
+@Override
+protected void setup() {
+    getLogger().atInfo().log("=== SETUP START ===");
+    // Registration code
+    getLogger().atInfo().log("=== SETUP COMPLETE ===");
+}
+
+@Override
+protected void start() {
+    getLogger().atInfo().log("=== START BEGIN ===");
+    // Initialization code
+    getLogger().atInfo().log("=== START COMPLETE ===");
+}
+
+@Override
+protected void shutdown() {
+    getLogger().atInfo().log("=== SHUTDOWN BEGIN ===");
+    // Cleanup code
+    getLogger().atInfo().log("=== SHUTDOWN COMPLETE ===");
+}
+```
+
+## Next Steps
+
+- [Configuration](/plugin-development/configuration) - Loading config in lifecycle
+- [Complete Examples](/plugin-development/examples) - Full plugin implementations
+- [Event System](/plugin-development/event-system) - Registering events in setup()

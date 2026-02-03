@@ -1,0 +1,28 @@
+{
+  "name": "hytale-docs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next",
+    "build": "next build && npx pagefind --site .next/server/app --output-path public/_pagefind",
+    "start": "next start",
+    "mcp": "node mcp-server/index.js",
+    "mcp:install": "cd mcp-server && npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "next": "^16.1.1",
+    "nextra": "^4.6.1",
+    "nextra-theme-docs": "^4.6.1",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.8",
+    "@types/react": "^19.2.8",
+    "typescript": "^5.9.3"
+  }
+}

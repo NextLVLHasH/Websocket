@@ -1,0 +1,384 @@
+# Multi-Server Architecture
+
+Hytale supports multi-server setups using transfer packets to move players between servers. This guide covers the architecture and implementation.
+
+## Overview
+
+Unlike Minecraft's BungeeCord/Velocity proxy model, Hytale uses a different approach:
+
+- **Transfer Packets**: Built-in mechanism to transfer players between servers
+- **Direct Connections**: Players connect directly to game servers
+- **Proxies Still Useful**: For load balancing, DDoS protection, and routing
+
+> "how does hytale handle multi server instance network? like in mc with multiple minigames etc?" - Discord
+> "you can use transfer packets to transfer players to other servers" - Community response
+
+## Transfer Packets
+
+### Basic Transfer
+
+Transfer a player to another server:
+
+```java
+public void transferPlayer(Player player, String targetHost, int targetPort) {
+    // Create transfer reference
+    player.getPlayerRef().referToServer(targetHost, targetPort);
+}
+
+// Example usage
+transferPlayer(player, "lobby.example.com", 5520);
+```
+
+### With Payload Data
+
+Transfer packets can carry data (up to 4KB):
+
+```java
+public void transferWithData(Player player, String host, int port, byte[] payload) {
+    // Payload must be under 4KB
+    if (payload.length > 4096) {
+        throw new IllegalArgumentException("Payload exceeds 4KB limit");
+    }
+
+    // Transfer with data
+    player.getPlayerRef().referToServer(host, port, payload);
+}
+
+// Example: Transfer with player stats
+public void transferToMinigame(Player player, String minigameServer) {
+    PlayerStats stats = getStats(player);
+    byte[] payload = serializeStats(stats);
+
+    player.getPlayerRef().referToServer(minigameServer, 5520, payload);
+}
+```
+
+### Receiving Transfer Data
+
+On the receiving server, handle incoming transfers:
+
+```java
+@Override
+protected void setup() {
+    getEventRegistry().register(PlayerTransferEvent.class, this::onPlayerTransfer);
+}
+
+private void onPlayerTransfer(PlayerTransferEvent event) {
+    byte[] payload = event.getPayload();
+
+    if (payload != null && payload.length > 0) {
+        PlayerStats stats = deserializeStats(payload);
+        applyStats(event.getPlayer(), stats);
+    }
+}
+```
+
+## Security Considerations
+
+### Signature Verification
+
+Always verify transfer packet signatures to prevent unauthorized transfers:
+
+```java
+private void onPlayerTransfer(PlayerTransferEvent event) {
+    // Verify signature
+    if (!verifyTransferSignature(event)) {
+        event.setCancelled(true);
+        getLogger().atWarning().log("Rejected unsigned transfer for: " + event.getPlayer().getName());
+        return;
+    }
+
+    // Process valid transfer
+    processTransfer(event);
+}
+```
+
+### Trusted Servers
+
+Maintain a list of trusted servers:
+
+```java
+private final Set<String> trustedServers = Set.of(
+    "lobby.example.com",
+    "survival.example.com",
+    "minigames.example.com"
+);
+
+private boolean isFromTrustedServer(PlayerTransferEvent event) {
+    return trustedServers.contains(event.getSourceServer());
+}
+```
+
+## Architecture Patterns
+
+### Hub/Lobby Pattern
+
+```
+                    ┌─────────────┐
+                    │   Lobby     │
+                    │  (Hub)      │
+                    └──────┬──────┘
+                           │
+           ┌───────────────┼───────────────┐
+           │               │               │
+    ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
+    │  Survival   │ │  Creative   │ │  Minigames  │
+    │   Server    │ │   Server    │ │   Server    │
+    └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+**Implementation:**
+
+```java
+// On lobby server
+public class LobbyPlugin extends JavaPlugin {
+
+    @Override
+    protected void setup() {
+        getCommandRegistry().registerCommand(new ServerCommand());
+    }
+
+    public class ServerCommand extends AbstractPlayerCommand {
+        private final RequiredArg<String> serverArg =
+            this.withRequiredArg("server", "lobby.server.arg", ArgTypes.STRING);
+
+        public ServerCommand() {
+            super("server", "lobby.commands.server");
+        }
+
+        @Override
+        protected void execute(Ref<EntityStore> ref, Store<EntityStore> store, CommandContext context) {
+            String server = serverArg.get(context);
+            Player player = store.getComponent(ref, Player.getComponentType());
+
+            switch (server.toLowerCase()) {
+                case "survival" -> transferPlayer(player, "survival.example.com", 5520);
+                case "creative" -> transferPlayer(player, "creative.example.com", 5520);
+                case "minigames" -> transferPlayer(player, "minigames.example.com", 5520);
+                default -> player.sendMessage(Message.raw("Unknown server: " + server));
+            }
+        }
+    }
+}
+```
+
+### Minigame Rotation Pattern
+
+```java
+public class MinigameManager {
+    private final List<String> gameServers = List.of(
+        "game1.example.com",
+        "game2.example.com",
+        "game3.example.com"
+    );
+
+    public void sendToAvailableGame(Player player) {
+        // Find server with open slot
+        String availableServer = findAvailableServer();
+
+        if (availableServer != null) {
+            player.getPlayerRef().referToServer(availableServer, 5520);
+        } else {
+            player.sendMessage(Message.raw("All game servers are full!"));
+        }
+    }
+
+    private String findAvailableServer() {
+        // Query each server for availability
+        // Implementation depends on your cross-server communication
+        return gameServers.stream()
+            .filter(this::hasOpenSlot)
+            .findFirst()
+            .orElse(null);
+    }
+}
+```
+
+## Cross-Server Communication
+
+### Redis Pub/Sub
+
+For real-time server communication:
+
+```java
+public class CrossServerMessaging {
+    private final JedisPool jedisPool;
+
+    public void broadcast(String channel, String message) {
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.publish(channel, message);
+        }
+    }
+
+    public void subscribe(String channel, Consumer<String> handler) {
+        CompletableFuture.runAsync(() -> {
+            try (Jedis jedis = jedisPool.getResource()) {
+                jedis.subscribe(new JedisPubSub() {
+                    @Override
+                    public void onMessage(String channel, String message) {
+                        handler.accept(message);
+                    }
+                }, channel);
+            }
+        });
+    }
+}
+
+// Usage
+messaging.subscribe("player-count", count -> {
+    getLogger().atInfo().log("Network player count: " + count);
+});
+
+messaging.broadcast("player-count", String.valueOf(getOnlinePlayers().size()));
+```
+
+### Database Sync
+
+For persistent cross-server data:
+
+```java
+public class PlayerDataSync {
+    private final DataSource dataSource;
+
+    public void savePlayerData(UUID playerId, PlayerData data) {
+        // Save to shared database before transfer
+        try (Connection conn = dataSource.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                "INSERT INTO player_data (uuid, data) VALUES (?, ?) ON CONFLICT UPDATE"
+            );
+            stmt.setString(1, playerId.toString());
+            stmt.setBytes(2, serialize(data));
+            stmt.executeUpdate();
+        }
+    }
+
+    public PlayerData loadPlayerData(UUID playerId) {
+        // Load from shared database after transfer
+        try (Connection conn = dataSource.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                "SELECT data FROM player_data WHERE uuid = ?"
+            );
+            stmt.setString(1, playerId.toString());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return deserialize(rs.getBytes("data"));
+            }
+        }
+        return null;
+    }
+}
+```
+
+## Proxy Considerations
+
+### When to Use a Proxy
+
+Despite transfer packets, proxies are still useful for:
+
+1. **DDoS Protection**: Shield backend servers
+2. **Load Balancing**: Distribute connections
+3. **Domain Routing**: Route based on subdomain
+4. **Fallback Handling**: Handle server failures
+
+### Proxy Setup
+
+```
+                    ┌─────────────┐
+     Internet  ────►│   Proxy     │
+                    │ (TCPShield) │
+                    └──────┬──────┘
+                           │
+           ┌───────────────┼───────────────┐
+           │               │               │
+    ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
+    │   Lobby     │ │  Survival   │ │  Minigames  │
+    └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+### HAProxy Support
+
+> "does the game support haproxy to forward IP addresses?" - Discord
+
+The game supports standard proxy protocols for IP forwarding.
+
+## Payload Size Limit
+
+The transfer packet payload is limited to **4KB** (4096 bytes):
+
+```java
+// Check payload size before transfer
+public void safeTransfer(Player player, String host, byte[] data) {
+    if (data.length > 4096) {
+        // Compress or truncate
+        data = compress(data);
+
+        if (data.length > 4096) {
+            // Store in database, pass reference instead
+            String dataRef = storeTemporary(data);
+            data = dataRef.getBytes(StandardCharsets.UTF_8);
+        }
+    }
+
+    player.getPlayerRef().referToServer(host, 5520, data);
+}
+```
+
+## Common Issues
+
+### Transfer Fails Silently
+
+**Cause**: Target server unreachable or connection refused.
+
+**Solution**: Implement status checking before transfer:
+
+```java
+public void transferWithCheck(Player player, String host, int port) {
+    if (!isServerOnline(host, port)) {
+        player.sendMessage(Message.raw("Target server is offline!"));
+        return;
+    }
+
+    player.getPlayerRef().referToServer(host, port);
+}
+
+private boolean isServerOnline(String host, int port) {
+    try (Socket socket = new Socket()) {
+        socket.connect(new InetSocketAddress(host, port), 1000);
+        return true;
+    } catch (IOException e) {
+        return false;
+    }
+}
+```
+
+### Data Lost During Transfer
+
+**Cause**: Payload not properly serialized or deserialized.
+
+**Solution**: Use consistent serialization:
+
+```java
+// Use JSON for cross-server compatibility
+private byte[] serialize(Object data) {
+    return gson.toJson(data).getBytes(StandardCharsets.UTF_8);
+}
+
+private <T> T deserialize(byte[] data, Class<T> type) {
+    return gson.fromJson(new String(data, StandardCharsets.UTF_8), type);
+}
+```
+
+## Summary
+
+| Feature | Hytale | Minecraft (Bungee) |
+|---------|--------|-------------------|
+| Player Transfer | Transfer packets | Proxy routing |
+| Data Transfer | 4KB payload | Plugin messages |
+| Proxy Required | No (optional) | Yes |
+| Direct Connection | Yes | Through proxy |
+
+## Next Steps
+
+- [Networking](/server-setup/networking) - Network configuration
+- [Performance](/server-setup/performance-optimization) - Multi-server performance
+- [Hosting Providers](/server-setup/hosting-providers) - Infrastructure options

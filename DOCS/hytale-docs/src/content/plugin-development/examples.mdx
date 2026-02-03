@@ -1,0 +1,889 @@
+# Complete Plugin Examples
+
+Real-world plugin examples demonstrating best practices and common patterns.
+
+## Example 1: Economy Plugin
+
+A complete economy system with currency, transactions, and persistence.
+
+### Features
+- Virtual currency system
+- Player balance management
+- Transaction history
+- Database persistence
+- Commands for managing economy
+
+### Project Structure
+```
+EconomyPlugin/
+├── src/main/java/com/example/economy/
+│   ├── EconomyPlugin.java
+│   ├── commands/
+│   │   ├── BalanceCommand.java
+│   │   ├── PayCommand.java
+│   │   └── EcoAdminCommand.java
+│   ├── data/
+│   │   ├── Account.java
+│   │   ├── Transaction.java
+│   │   ├── EconomyDatabase.java
+│   │   └── AccountRepository.java
+│   ├── service/
+│   │   └── EconomyService.java
+│   └── events/
+│       └── EconomyListener.java
+└── src/main/resources/
+    ├── manifest.json
+    └── config.yml
+```
+
+### Main Plugin Class
+
+```java
+package com.example.economy;
+
+import com.hytale.api.plugin.JavaPlugin;
+import com.hytale.api.event.player.PlayerReadyEvent;
+import com.hytale.api.event.player.PlayerDisconnectEvent;
+import java.util.concurrent.*;
+
+public class EconomyPlugin extends JavaPlugin {
+
+    private EconomyDatabase database;
+    private AccountRepository accountRepo;
+    private EconomyService economyService;
+    private ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> saveTask;
+
+    @Override
+    protected void setup() {
+        getLogger().atInfo().log("Setting up Economy Plugin...");
+
+        // Register events
+        getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onPlayerJoin);
+        getEventRegistry().register(PlayerDisconnectEvent.class, this::onPlayerLeave);
+
+        // Register commands
+        getCommandRegistry().registerCommand(new BalanceCommand(this));
+        getCommandRegistry().registerCommand(new PayCommand(this));
+        getCommandRegistry().registerCommand(new EcoAdminCommand(this));
+    }
+
+    @Override
+    protected void start() {
+        getLogger().atInfo().log("Starting Economy Plugin...");
+
+        // Initialize database
+        database = new EconomyDatabase(getDataFolder());
+        database.connect();
+
+        // Create repository
+        accountRepo = new AccountRepository(database);
+
+        // Create service
+        economyService = new EconomyService(accountRepo);
+        registerService(economyService);
+
+        // Start auto-save task (every 5 minutes)
+        scheduler = Executors.newScheduledThreadPool(1);
+        saveTask = scheduler.scheduleAtFixedRate(
+            this::saveAllAccounts,
+            5, 5, TimeUnit.MINUTES
+        );
+
+        getLogger().atInfo().log("Economy Plugin started!");
+    }
+
+    @Override
+    protected void shutdown() {
+        getLogger().atInfo().log("Shutting down Economy Plugin...");
+
+        // Save all accounts
+        saveAllAccounts();
+
+        // Stop scheduled tasks
+        if (saveTask != null) {
+            saveTask.cancel(false);
+        }
+
+        if (scheduler != null) {
+            scheduler.shutdown();
+            try {
+                if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    scheduler.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                scheduler.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // Close database
+        if (database != null) {
+            database.close();
+        }
+
+        getLogger().atInfo().log("Economy Plugin shut down complete");
+    }
+
+    private void onPlayerJoin(PlayerReadyEvent event) {
+        UUID uuid = event.getPlayer().getUuid();
+
+        // Load account asynchronously
+        CompletableFuture.supplyAsync(() -> {
+            return accountRepo.findOrCreate(uuid);
+        }).thenAccept(account -> {
+            economyService.cacheAccount(account);
+
+            // Send welcome message with balance
+            event.getPlayer().sendMessage(
+                Message.raw("Balance: $" + account.getBalance())
+            );
+        });
+    }
+
+    private void onPlayerLeave(PlayerDisconnectEvent event) {
+        UUID uuid = event.getPlayer().getUuid();
+
+        // Save and unload account
+        Account account = economyService.getAccount(uuid);
+        if (account != null) {
+            accountRepo.save(account);
+            economyService.removeFromCache(uuid);
+        }
+    }
+
+    private void saveAllAccounts() {
+        getLogger().atInfo().log("Auto-saving all accounts...");
+        economyService.getAllCachedAccounts().forEach(account -> {
+            accountRepo.save(account);
+        });
+    }
+
+    public EconomyService getEconomyService() {
+        return economyService;
+    }
+}
+```
+
+### Account Model
+
+```java
+package com.example.economy.data;
+
+import java.util.*;
+
+public class Account {
+    private final UUID playerUuid;
+    private double balance;
+    private final List<Transaction> transactions;
+
+    public Account(UUID playerUuid, double startingBalance) {
+        this.playerUuid = playerUuid;
+        this.balance = startingBalance;
+        this.transactions = new ArrayList<>();
+    }
+
+    public void deposit(double amount, String reason) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Amount must be positive");
+        }
+
+        balance += amount;
+        transactions.add(new Transaction(
+            TransactionType.DEPOSIT,
+            amount,
+            reason,
+            System.currentTimeMillis()
+        ));
+    }
+
+    public boolean withdraw(double amount, String reason) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Amount must be positive");
+        }
+
+        if (balance < amount) {
+            return false;
+        }
+
+        balance -= amount;
+        transactions.add(new Transaction(
+            TransactionType.WITHDRAW,
+            amount,
+            reason,
+            System.currentTimeMillis()
+        ));
+
+        return true;
+    }
+
+    public boolean transfer(Account recipient, double amount) {
+        if (withdraw(amount, "Transfer to " + recipient.getPlayerUuid())) {
+            recipient.deposit(amount, "Transfer from " + playerUuid);
+            return true;
+        }
+        return false;
+    }
+
+    // Getters
+    public UUID getPlayerUuid() { return playerUuid; }
+    public double getBalance() { return balance; }
+    public List<Transaction> getTransactions() { return transactions; }
+}
+```
+
+### Economy Service
+
+```java
+package com.example.economy.service;
+
+import com.example.economy.data.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class EconomyService {
+    private final AccountRepository repository;
+    private final Map<UUID, Account> cache = new ConcurrentHashMap<>();
+
+    public EconomyService(AccountRepository repository) {
+        this.repository = repository;
+    }
+
+    public Account getAccount(UUID uuid) {
+        return cache.computeIfAbsent(uuid, repository::findOrCreate);
+    }
+
+    public void cacheAccount(Account account) {
+        cache.put(account.getPlayerUuid(), account);
+    }
+
+    public void removeFromCache(UUID uuid) {
+        cache.remove(uuid);
+    }
+
+    public Collection<Account> getAllCachedAccounts() {
+        return cache.values();
+    }
+
+    public boolean transfer(UUID from, UUID to, double amount) {
+        Account sender = getAccount(from);
+        Account recipient = getAccount(to);
+
+        return sender.transfer(recipient, amount);
+    }
+
+    public double getBalance(UUID uuid) {
+        return getAccount(uuid).getBalance();
+    }
+
+    public void deposit(UUID uuid, double amount, String reason) {
+        getAccount(uuid).deposit(amount, reason);
+    }
+
+    public boolean withdraw(UUID uuid, double amount, String reason) {
+        return getAccount(uuid).withdraw(amount, reason);
+    }
+}
+```
+
+### Commands
+
+```java
+package com.example.economy.commands;
+
+import com.hytale.api.command.*;
+import com.hytale.api.entity.player.Player;
+import com.hytale.api.message.Message;
+
+public class BalanceCommand extends CommandBase {
+    private final EconomyPlugin plugin;
+
+    public BalanceCommand(EconomyPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public String getName() {
+        return "balance";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Check your balance";
+    }
+
+    @Override
+    public void execute(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("Only players can check balance");
+            return;
+        }
+
+        Player player = (Player) sender;
+        double balance = plugin.getEconomyService().getBalance(player.getUuid());
+
+        player.sendMessage(Message.raw("Your balance: $" + String.format("%.2f", balance)));
+    }
+}
+
+public class PayCommand extends CommandBase {
+    private final EconomyPlugin plugin;
+
+    public PayCommand(EconomyPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public String getName() {
+        return "pay";
+    }
+
+    @Override
+    public void execute(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("Only players can pay");
+            return;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage("Usage: /pay <player> <amount>");
+            return;
+        }
+
+        Player player = (Player) sender;
+
+        // Find target player by name
+        Player target = plugin.getServer().getPlayerByName(args[0]).orElse(null);
+
+        if (target == null) {
+            sender.sendMessage("Player not found");
+            return;
+        }
+
+        double amount;
+        try {
+            amount = Double.parseDouble(args[1]);
+        } catch (NumberFormatException e) {
+            sender.sendMessage("Invalid amount");
+            return;
+        }
+
+        if (amount <= 0) {
+            sender.sendMessage("Amount must be positive");
+            return;
+        }
+
+        boolean success = plugin.getEconomyService().transfer(
+            player.getUuid(),
+            target.getUuid(),
+            amount
+        );
+
+        if (success) {
+            player.sendMessage(Message.raw("Sent $" + amount + " to " + target.getName()));
+            target.sendMessage(Message.raw("Received $" + amount + " from " + player.getName()));
+        } else {
+            player.sendMessage(Message.raw("Insufficient funds"));
+        }
+    }
+}
+```
+
+## Example 2: Warp System
+
+A teleportation system with named locations and permissions.
+
+### Features
+- Create/delete warps
+- List all warps
+- Permission-based access
+- YAML configuration
+- Cool-down system
+
+### Main Plugin Class
+
+```java
+package com.example.warps;
+
+public class WarpPlugin extends JavaPlugin {
+    private WarpManager warpManager;
+    private CooldownManager cooldownManager;
+    private YamlConfig config;
+
+    @Override
+    protected void setup() {
+        // Register commands
+        getCommandRegistry().registerCommand(new WarpCommand(this));
+        getCommandRegistry().registerCommand(new SetWarpCommand(this));
+        getCommandRegistry().registerCommand(new DelWarpCommand(this));
+        getCommandRegistry().registerCommand(new WarpsCommand(this));
+    }
+
+    @Override
+    protected void start() {
+        // Load configuration
+        config = new YamlConfig(new File(getDataFolder(), "warps.yml"));
+
+        // Initialize managers
+        warpManager = new WarpManager(config);
+        cooldownManager = new CooldownManager();
+
+        // Load warps
+        warpManager.loadWarps();
+
+        getLogger().atInfo().log("Loaded " + warpManager.getWarpCount() + " warps");
+    }
+
+    @Override
+    protected void shutdown() {
+        // Save warps
+        warpManager.saveWarps();
+
+        getLogger().atInfo().log("Warps saved");
+    }
+
+    public WarpManager getWarpManager() { return warpManager; }
+    public CooldownManager getCooldownManager() { return cooldownManager; }
+}
+```
+
+### Warp Manager
+
+```java
+package com.example.warps;
+
+public class WarpManager {
+    private final Map<String, Warp> warps = new ConcurrentHashMap<>();
+    private final YamlConfig config;
+
+    public WarpManager(YamlConfig config) {
+        this.config = config;
+    }
+
+    public void loadWarps() {
+        warps.clear();
+        ConfigurationNode warpsNode = config.getNode("warps");
+
+        for (Entry<Object, ? extends ConfigurationNode> entry : warpsNode.childrenMap().entrySet()) {
+            String name = entry.getKey().toString();
+            ConfigurationNode warpNode = entry.getValue();
+
+            Warp warp = new Warp(
+                name,
+                warpNode.node("world").getString("default"),
+                warpNode.node("x").getDouble(0),
+                warpNode.node("y").getDouble(0),
+                warpNode.node("z").getDouble(0),
+                warpNode.node("yaw").getFloat(0),
+                warpNode.node("pitch").getFloat(0),
+                warpNode.node("permission").getString("")
+            );
+
+            warps.put(name.toLowerCase(), warp);
+        }
+    }
+
+    public void saveWarps() {
+        ConfigurationNode warpsNode = config.getNode("warps");
+
+        warps.forEach((name, warp) -> {
+            ConfigurationNode warpNode = warpsNode.node(name);
+            warpNode.node("world").set(warp.getWorld());
+            warpNode.node("x").set(warp.getX());
+            warpNode.node("y").set(warp.getY());
+            warpNode.node("z").set(warp.getZ());
+            warpNode.node("yaw").set(warp.getYaw());
+            warpNode.node("pitch").set(warp.getPitch());
+            warpNode.node("permission").set(warp.getPermission());
+        });
+
+        config.save();
+    }
+
+    public void createWarp(String name, Location location, String permission) {
+        Warp warp = new Warp(
+            name,
+            location.getWorld(),
+            location.getX(),
+            location.getY(),
+            location.getZ(),
+            location.getYaw(),
+            location.getPitch(),
+            permission
+        );
+
+        warps.put(name.toLowerCase(), warp);
+        saveWarps();
+    }
+
+    public boolean deleteWarp(String name) {
+        if (warps.remove(name.toLowerCase()) != null) {
+            saveWarps();
+            return true;
+        }
+        return false;
+    }
+
+    public Warp getWarp(String name) {
+        return warps.get(name.toLowerCase());
+    }
+
+    public Set<String> getWarpNames() {
+        return warps.keySet();
+    }
+
+    public int getWarpCount() {
+        return warps.size();
+    }
+}
+```
+
+### Warp Command with Cooldown
+
+```java
+package com.example.warps.commands;
+
+public class WarpCommand extends CommandBase {
+    private final WarpPlugin plugin;
+
+    public WarpCommand(WarpPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public String getName() {
+        return "warp";
+    }
+
+    @Override
+    public void execute(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("Only players can warp");
+            return;
+        }
+
+        if (args.length < 1) {
+            sender.sendMessage("Usage: /warp <name>");
+            return;
+        }
+
+        Player player = (Player) sender;
+        String warpName = args[0];
+
+        // Get warp
+        Warp warp = plugin.getWarpManager().getWarp(warpName);
+        if (warp == null) {
+            player.sendMessage(Message.raw("Warp not found"));
+            return;
+        }
+
+        // Check permission
+        if (!warp.getPermission().isEmpty() && !player.hasPermission(warp.getPermission())) {
+            player.sendMessage(Message.raw("You don't have permission to use this warp"));
+            return;
+        }
+
+        // Check cooldown
+        CooldownManager cooldowns = plugin.getCooldownManager();
+        if (cooldowns.hasCooldown(player.getUuid(), "warp")) {
+            long remaining = cooldowns.getRemaining(player.getUuid(), "warp");
+            player.sendMessage(Message.raw("Please wait " + remaining + " seconds"));
+            return;
+        }
+
+        // Teleport
+        Location location = warp.toLocation();
+        player.teleport(location);
+        player.sendMessage(Message.raw("Warped to " + warpName));
+
+        // Set cooldown (10 seconds)
+        if (!player.hasPermission("warps.bypass.cooldown")) {
+            cooldowns.setCooldown(player.getUuid(), "warp", 10);
+        }
+    }
+
+    @Override
+    public List<String> tabComplete(CommandSender sender, String[] args) {
+        if (args.length == 1) {
+            return new ArrayList<>(plugin.getWarpManager().getWarpNames());
+        }
+        return Collections.emptyList();
+    }
+}
+```
+
+## Example 3: PvP Arena System
+
+A complete arena system with join/leave, teams, and stats tracking.
+
+### Features
+- Create/manage arenas
+- Team-based combat
+- Kill/death tracking
+- Spectator mode
+- ECS integration
+
+### Arena System with ECS
+
+```java
+package com.example.arena;
+
+public class ArenaPlugin extends JavaPlugin {
+    private ArenaManager arenaManager;
+    private StatsDatabase statsDb;
+
+    @Override
+    protected void setup() {
+        // Register ECS system
+        getEntityStoreRegistry().registerSystem(new ArenaDeathSystem(this));
+
+        // Register events
+        getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onJoin);
+        getEventRegistry().register(PlayerDisconnectEvent.class, this::onLeave);
+
+        // Register commands
+        getCommandRegistry().registerCommand(new ArenaCommand(this));
+        getCommandRegistry().registerCommand(new ArenaAdminCommand(this));
+    }
+
+    @Override
+    protected void start() {
+        // Initialize database
+        statsDb = new StatsDatabase(getDataFolder());
+        statsDb.connect();
+
+        // Create arena manager
+        arenaManager = new ArenaManager(this);
+
+        // Load arenas from config
+        arenaManager.loadArenas();
+
+        getLogger().atInfo().log("Loaded " + arenaManager.getArenaCount() + " arenas");
+    }
+
+    @Override
+    protected void shutdown() {
+        // Remove all players from arenas
+        arenaManager.clearAll();
+
+        // Save stats
+        statsDb.saveAll();
+        statsDb.close();
+    }
+
+    private void onJoin(PlayerReadyEvent event) {
+        // Load player stats
+        UUID uuid = event.getPlayer().getUuid();
+        statsDb.loadPlayerStats(uuid);
+    }
+
+    private void onLeave(PlayerDisconnectEvent event) {
+        UUID uuid = event.getPlayer().getUuid();
+
+        // Remove from arena if in one
+        arenaManager.removePlayer(uuid);
+
+        // Save stats
+        statsDb.savePlayerStats(uuid);
+    }
+
+    public ArenaManager getArenaManager() { return arenaManager; }
+    public StatsDatabase getStatsDb() { return statsDb; }
+}
+```
+
+### Arena Death System (ECS)
+
+```java
+package com.example.arena.systems;
+
+public class ArenaDeathSystem extends EntityEventSystem {
+    private final ArenaPlugin plugin;
+
+    public ArenaDeathSystem(ArenaPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public void eventRegistration(EventRegistry registry) {
+        registry.registerEvent(DeathEvent.class, this::onDeath);
+    }
+
+    private void onDeath(EntityStore store, long entity, DeathEvent event) {
+        // Check if entity is a player
+        if (!store.hasComponent(entity, PlayerComponent.class)) {
+            return;
+        }
+
+        Player player = store.getComponent(entity, PlayerComponent.class).getPlayer();
+        UUID uuid = player.getUuid();
+
+        // Check if player is in arena
+        Arena arena = plugin.getArenaManager().getPlayerArena(uuid);
+        if (arena == null) {
+            return;
+        }
+
+        // Handle arena death
+        arena.onPlayerDeath(player, event.getKiller());
+
+        // Update stats
+        plugin.getStatsDb().incrementDeaths(uuid);
+
+        if (event.getKiller() instanceof Player) {
+            Player killer = (Player) event.getKiller();
+            plugin.getStatsDb().incrementKills(killer.getUuid());
+
+            // Award points
+            arena.awardKill(killer);
+        }
+
+        // Respawn in arena
+        Location spawnPoint = arena.getSpawnPoint(player);
+
+        store.runLater(() -> {
+            player.teleport(spawnPoint);
+            player.heal();
+        }, 20); // 1 second delay
+    }
+}
+```
+
+## Example 4: Anti-Cheat Detection
+
+Basic anti-cheat using ECS systems and event monitoring.
+
+```java
+package com.example.anticheat;
+
+public class AntiCheatPlugin extends JavaPlugin {
+    private ViolationManager violationManager;
+
+    @Override
+    protected void setup() {
+        // Register ECS systems
+        getEntityStoreRegistry().registerSystem(new FlyCheckSystem(this));
+        getEntityStoreRegistry().registerSystem(new SpeedCheckSystem(this));
+        getEntityStoreRegistry().registerSystem(new ReachCheckSystem(this));
+
+        // Register event listeners
+        getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, future -> {
+            future.thenAccept(event -> checkChatSpam(event));
+        });
+    }
+
+    @Override
+    protected void start() {
+        violationManager = new ViolationManager(this);
+    }
+
+    private void checkChatSpam(PlayerChatEvent event) {
+        Player player = event.getPlayer();
+
+        if (violationManager.addChatMessage(player.getUuid())) {
+            // Too many messages
+            violationManager.addViolation(player.getUuid(), ViolationType.SPAM);
+            event.cancel();
+        }
+    }
+
+    public ViolationManager getViolationManager() {
+        return violationManager;
+    }
+}
+
+// Speed check system
+public class SpeedCheckSystem extends EntityTickSystem {
+    private final AntiCheatPlugin plugin;
+    private final Map<Long, Vector3> lastPositions = new HashMap<>();
+
+    public SpeedCheckSystem(AntiCheatPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public void tick(EntityStore store, long entity) {
+        if (!store.hasComponent(entity, PlayerComponent.class)) {
+            return;
+        }
+
+        if (!store.hasComponent(entity, PositionComponent.class)) {
+            return;
+        }
+
+        Player player = store.getComponent(entity, PlayerComponent.class).getPlayer();
+        PositionComponent pos = store.getComponent(entity, PositionComponent.class);
+
+        Vector3 current = pos.getPosition();
+        Vector3 last = lastPositions.get(entity);
+
+        if (last != null) {
+            double distance = current.distance(last);
+            double maxSpeed = player.hasPermission("anticheat.bypass") ? 100 : 10;
+
+            if (distance > maxSpeed) {
+                plugin.getViolationManager().addViolation(
+                    player.getUuid(),
+                    ViolationType.SPEED
+                );
+
+                // Teleport back
+                player.teleport(last.toLocation());
+            }
+        }
+
+        lastPositions.put(entity, current);
+    }
+}
+```
+
+## Best Practices Demonstrated
+
+### 1. Clean Architecture
+- Separation of concerns
+- Service layer pattern
+- Repository pattern for data access
+- Manager classes for business logic
+
+### 2. Proper Lifecycle Management
+- Resource initialization in start()
+- Cleanup in shutdown()
+- Async operations for heavy tasks
+- Scheduled tasks with proper cancellation
+
+### 3. Error Handling
+- Validation of user input
+- Try-catch for database operations
+- Graceful degradation
+- Logging errors appropriately
+
+### 4. Performance
+- Caching frequently accessed data
+- Async database operations
+- Efficient ECS queries
+- Resource pooling
+
+### 5. User Experience
+- Clear command messages
+- Tab completion
+- Permission checks
+- Cooldowns for spam prevention
+
+## Next Steps
+
+Study these examples and adapt them to your needs:
+
+1. **Start Simple** - Begin with the basic structure
+2. **Add Features Gradually** - Don't implement everything at once
+3. **Test Thoroughly** - Use hot reload for quick iteration
+4. **Read the Docs** - Reference other documentation pages
+5. **Ask for Help** - Community is here to support
+
+## Related Documentation
+
+- [Getting Started](/plugin-development/getting-started) - Your first plugin
+- [Event System](/plugin-development/event-system) - Handling events
+- [Commands](/plugin-development/commands) - Creating commands
+- [ECS Architecture](/plugin-development/ecs-architecture) - Entity systems
+- [Configuration](/plugin-development/configuration) - Data persistence
+- [Lifecycle](/plugin-development/lifecycle) - Plugin management

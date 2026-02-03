@@ -1,0 +1,659 @@
+# Common Issues & Solutions
+
+Troubleshooting guide based on real problems and solutions from the Hytale developer community.
+
+## Connection Issues
+
+### "Server requires development mode"
+
+**Problem**: Players see "Server requires development mode" when trying to connect.
+
+**Solutions**:
+1. **Check Authentication Settings**
+   - Server may have auth disabled with `/auth insecure`
+   - Verify your game has development mode enabled in settings
+   - Friends connecting may need to enable dev mode too
+
+2. **Verify Server Configuration**
+   ```bash
+   # Check if server has authentication disabled
+   # Look for auth settings in server config
+   ```
+
+3. **Development Mode Location**
+   - In game settings
+   - Under developer/advanced options
+   - Enable "Allow development servers"
+
+### "Failed to connect / Connection timeout"
+
+**Problem**: Cannot connect to server, connection times out.
+
+**Solutions**:
+
+1. **Port Forwarding**
+   - Ensure port 5520 is forwarded correctly
+   - See [Port Forwarding Guide](/server-setup/port-forwarding)
+   - Test with port checker tool
+
+2. **Firewall Rules**
+   ```bash
+   # Windows
+   netsh advfirewall firewall add rule name="Hytale" dir=in action=allow protocol=TCP localport=5520
+
+   # Linux (UFW)
+   sudo ufw allow 5520/tcp
+
+   # Check firewall status
+   sudo ufw status
+   ```
+
+3. **Verify Server is Running**
+   - Check server console for errors
+   - Ensure server finished starting up
+   - Look for "Server started" or similar message
+
+4. **CGNAT Issues**
+   > "If you're behind CGNAT (carrier-grade NAT), port forwarding won't work - you'll need a VPS or tunneling service like Playit.gg" - From Discord
+
+5. **Test Local Connection First**
+   - Try connecting via `localhost:5520`
+   - If local works but external doesn't, it's a network issue
+   - If local doesn't work, it's a server issue
+
+### "Server authentication unavailable"
+
+**Problem**: Authentication services not responding.
+
+**Solutions**:
+- Wait for Hytale authentication services to come back online
+- Check Hytale status page or Discord for service updates
+- Use `/auth insecure` for LAN testing only (not recommended for public servers)
+- The game will now automatically switch to offline mode if authentication fails (as of January 2026 hotfix)
+
+## Thread & Component Errors
+
+### "Assert not in thread!" Error
+
+**Problem**: When accessing entity components, you get:
+```
+java.lang.IllegalStateException: Assert not in thread!
+Thread[#108,WorldThread - default,5,InnocuousForkJoinWorkerThreadGroup]
+but was in Thread[#75,Scheduler,5,main]
+```
+
+**Cause**: You're trying to access ECS components from the wrong thread. Component operations must run on the world thread.
+
+**Solutions**:
+
+1. **For Commands**: Use `AbstractPlayerCommand` instead of `CommandBase`
+   ```java
+   // WRONG - CommandBase runs on scheduler thread
+   public class MyCommand extends CommandBase {
+       protected void executeSync(CommandContext context) {
+           // This crashes!
+           store.getComponent(ref, CustomComponent.getComponentType());
+       }
+   }
+
+   // CORRECT - AbstractPlayerCommand provides thread-safe context
+   public class MyCommand extends AbstractPlayerCommand {
+       protected void execute(Ref<EntityStore> ref, Store<EntityStore> store, CommandContext ctx) {
+           // Safe - runs on world thread
+           store.getComponent(ref, CustomComponent.getComponentType());
+       }
+   }
+   ```
+
+2. **For Async Events**: Use `world.execute()` to schedule on world thread
+   ```java
+   world.execute(() -> {
+       // Safe to access components here
+       CustomComponent component = store.getComponent(ref, CustomComponent.getComponentType());
+   });
+   ```
+
+3. **For Event Systems**: Use `EntityEventSystem` which handles threading automatically
+
+See [Thread Safety Guide](/plugin-development/thread-safety) for detailed patterns.
+
+### Component Returns Null Unexpectedly
+
+**Problem**: `store.getComponent()` returns null even though the entity should have the component.
+
+**Solutions**:
+1. Verify you're using the correct `ComponentType` (e.g., `Player.getComponentType()`)
+2. Check if you're on the correct thread (see above)
+3. Ensure the entity still exists and hasn't been destroyed
+4. For custom components, verify registration in `setup()`
+
+## Plugin Issues
+
+## Legal & EULA (Modding)
+
+**Status**: Official policy has not been published yet.
+
+**Community Questions**:
+- Copyrighted content in mods (e.g., fan IP)
+- Paid or paywalled mods
+- Redistribution and asset licensing
+
+Until official guidance exists, assume standard copyright rules apply and avoid distributing unlicensed third-party content.
+
+### Plugin Not Loading
+
+**Problem**: Plugin doesn't appear in `/plugins` list or shows "missing or invalid manifest.json".
+
+**Solutions**:
+
+1. **Verify manifest.json exists and is valid**
+
+   The manifest.json must be in the JAR root (inside `src/main/resources/`):
+   ```json
+   {
+     "Group": "com.example",
+     "Name": "MyPlugin",
+     "Version": "1.0.0",
+     "Main": "com.example.myplugin.MyPlugin",
+     "ServerVersion": "*"
+   }
+   ```
+
+   > "Skipping pack at MyPlugin: missing or invalid manifest.json" - This error means the manifest is missing or has invalid JSON syntax.
+
+2. **Check Plugin Structure**
+   ```
+   my-plugin.jar
+   ├── manifest.json          # Must be at JAR root!
+   ├── com/
+   │   └── example/
+   │       └── myplugin/
+   │           └── MyPlugin.class
+   └── ...
+   ```
+
+3. **Enable Development Mode**
+   - Check game settings
+   - Ensure dev mode is enabled
+   - Required for custom plugins
+
+4. **Check Server Logs**
+   - Look for plugin loading errors
+   - Check for class loading exceptions
+   - Verify Java version compatibility
+
+5. **Plugin Location**
+   - Place in `/mods` folder
+   - NOT in root directory or other locations
+
+### "Missing or invalid manifest.json" Error
+
+**Problem**: Server logs show `Skipping pack at MyPlugin: missing or invalid manifest.json`
+
+**Solutions**:
+
+1. **Verify manifest.json location**
+   - Must be at the root of your JAR file
+   - In Gradle/Maven projects: `src/main/resources/manifest.json`
+
+2. **Validate JSON syntax**
+   - Use a JSON validator
+   - Check for missing commas, quotes, or brackets
+   - Field names are case-sensitive (`Group` not `group`)
+
+3. **Required fields**
+   ```json
+   {
+     "Group": "your.group.name",
+     "Name": "PluginName",
+     "Version": "1.0.0",
+     "Main": "your.group.name.MainClass"
+   }
+   ```
+
+4. **Example working manifest**
+   ```json
+   {
+     "Group": "UltimateTeam",
+     "Name": "UltimateLobby",
+     "Version": "1.0.0",
+     "Authors": [{ "Name": "Developer" }],
+     "Main": "com.example.ultimateLobby.Main",
+     "ServerVersion": "*"
+   }
+   ```
+
+### "Class not found" Errors
+
+**Problem**: Plugin fails to load with ClassNotFoundException.
+
+**Solutions**:
+
+1. **Shade Dependencies**
+   ```kotlin
+   // Gradle: Use shadow plugin
+   plugins {
+       id("com.github.johnrengelman.shadow") version "8.1.1"
+   }
+
+   tasks.shadowJar {
+       // Relocate dependencies to avoid conflicts
+       relocate("org.example", "com.myplugin.shaded.example")
+   }
+   ```
+
+2. **For Kotlin**
+   - Shade Kotlin standard library into JAR
+   - Community recommendation for Kotlin plugins
+
+3. **Check Dependencies**
+   - Ensure all required libraries are included
+   - Use `compileOnly` for server JAR
+   - Use `implementation` for external libraries
+
+### Plugin Reload Issues
+
+**Problem**: `/plugin reload` doesn't work or causes file locking issues.
+
+**Solutions**:
+
+From Discord:
+> "Most developers restart server for testing" - Community consensus
+
+**Recommended Workflow**:
+1. Build plugin JAR
+2. Stop server
+3. Replace JAR in `/mods` folder
+4. Start server
+
+**Alternative**: Use development server that auto-restarts on changes.
+
+### ZipException on Plugin Reload
+
+**Problem**: After executing `/plugin reload <pluginId>`, you get:
+```
+java.util.zip.ZipException: ZipFile invalid LOC header (bad signature)
+```
+
+**Cause**: The plugin JAR file was modified while the server was running, corrupting the file handle.
+
+**Solution**: Hot-reload is currently broken for most cases. Always:
+1. Stop the server completely
+2. Replace the plugin JAR
+3. Start the server fresh
+
+There is no working hot-reload for plugins at this time. Use external tools like HotSwap for code changes during development.
+
+### "Cannot resolve symbol 'hypixel'" Error
+
+**Problem**: IDE shows `Cannot resolve symbol 'hypixel'` or similar import errors.
+
+**Causes & Solutions**:
+
+1. **Missing HytaleServer.jar dependency**
+   ```kotlin
+   // build.gradle.kts
+   dependencies {
+       compileOnly(files("libs/HytaleServer.jar"))
+   }
+   ```
+
+2. **Java Version Mismatch**
+   - Ensure you're using Java 25 (not 21 or earlier)
+   - Check IDE project SDK settings
+   - Verify `sourceCompatibility` and `targetCompatibility` in build.gradle
+
+3. **IDE Cache Issues**
+   - IntelliJ: File > Invalidate Caches > Invalidate and Restart
+   - Reimport Gradle project
+
+## Performance Issues
+
+### High RAM Usage
+
+**Problem**: Server consuming excessive memory.
+
+**Solutions**:
+
+1. **Garbage Collection Tuning**
+   ```bash
+   # G1GC (recommended)
+   java -Xms2G -Xmx8G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -jar server.jar
+
+   # ZGC (trades CPU for lower pause times)
+   java -Xms2G -Xmx8G -XX:+UseZGC -jar server.jar
+   ```
+
+2. **Pre-generate Worlds**
+   > "Pre-generate your worlds before opening to players - exploration is the biggest RAM consumer." - From Discord
+
+3. **Reduce View Distance**
+   - Lower in server config
+   - Reduces chunk loading
+
+4. **Chunk Management**
+   - Use chunk unloading plugins
+   - Limit loaded chunks
+   - Pre-generate spawn area
+
+5. **Player Distribution**
+   > "4 players flying in different directions crashed 8GB server" - Community testing
+
+   RAM usage increases dramatically when players spread out exploring.
+
+### Server Lag / TPS Drop
+
+**Problem**: Server tick rate dropping below 30 TPS.
+
+**Solutions**:
+
+1. **Identify Bottleneck**
+   - Use performance profiler
+   - Check which world/plugin is causing lag
+   - Monitor CPU and disk I/O
+
+2. **Disable Unused Modules**
+   - Server has 70+ modules that can be disabled
+   - Turn off features you don't need
+   - See server configuration documentation
+
+3. **Optimize Plugins**
+   - Remove or replace laggy plugins
+   - Profile plugin event handlers
+   - Use asynchronous operations
+
+4. **Hardware Upgrade**
+   - More RAM if memory-constrained
+   - Better CPU for computation
+   - SSD/NVMe for disk I/O
+
+## Authentication & Security
+
+### OAuth2 Device Flow Errors
+
+**Problem**: When running `/auth login device`, you get:
+```
+Device authorization request failed
+```
+
+**Cause**: The device flow may be blocked or have connectivity issues.
+
+**Solutions**:
+1. **Use browser authentication instead**:
+   ```
+   /auth login browser
+   ```
+
+2. **After successful login, persist credentials**:
+   ```
+   /auth persistence encrypted
+   ```
+
+3. **Check for clock sync issues**: Ensure your server's system clock is accurate. Outdated time can cause token validation failures.
+
+### "Cannot save credentials" Warning
+
+**Problem**: Server logs show:
+```
+[EncryptedAuthCredentialStore] Cannot save credentials - no encryption key available
+```
+
+**Solutions**:
+1. Run `/auth persistence encrypted` to set up encrypted storage
+2. Ensure the server has write permissions to its config directory
+3. For development, you can use `/auth insecure` (not recommended for production)
+
+### Player Token/Authentication Issues
+
+**Problem**: Players get kicked or can't join due to token issues, including "invalid token" errors.
+
+**Solutions**:
+
+1. **Clock Sync Issue**: Player's PC clock may be wrong
+   - Have player check and update their system time
+   - The launcher now warns players if their computer time is out of date
+   - This has been a common cause of authentication failures and was addressed in the [January 2026 hotfixes](/hotfixes)
+
+2. **Token Refresh**: Try having the player:
+   - Close the game completely
+   - Restart the Hytale launcher
+   - Rejoin the server
+
+3. **DNS Issues**: Try flushing DNS
+   ```bash
+   # Windows
+   ipconfig /flushdns
+
+   # macOS
+   sudo dscacheutil -flushcache
+
+   # Linux
+   sudo systemd-resolve --flush-caches
+   ```
+
+### Authentication Errors
+
+**Problem**: Various authentication-related issues.
+
+**Solutions**:
+
+1. **Development vs Production**
+   - Development: `/auth insecure` (testing only)
+   - Production: Use proper authentication
+
+2. **Friend Connection Issues**
+   - Ensure both parties have compatible auth settings
+   - Check if friend has dev mode enabled
+   - Verify server whitelist settings
+
+### DDoS Attacks
+
+**Problem**: Server under DDoS attack.
+
+**Recommended Protection** (from Discord):
+- **TCPShield**: Popular in Minecraft, may work
+- **GSL**: Confirmed working solution
+- **GCore**: Alternative protection
+- **Datapacket**: Another option
+
+**CloudFlare Note**: Standard proxy doesn't support game ports - need Spectrum (paid) or other solutions.
+
+## Building & Development
+
+### Build Failures
+
+**Problem**: Plugin won't compile or build.
+
+**Solutions**:
+
+1. **Java Version Mismatch**
+   ```bash
+   # Check Java version
+   java -version
+   javac -version
+
+   # Ensure using Java 17+
+   ```
+
+2. **Gradle Issues**
+   ```bash
+   # Clear Gradle cache
+   ./gradlew clean
+
+   # Rebuild
+   ./gradlew build --refresh-dependencies
+   ```
+
+3. **Maven Issues**
+   ```bash
+   # Clean and rebuild
+   mvn clean install
+
+   # Update dependencies
+   mvn dependency:purge-local-repository
+   ```
+
+### IDE Not Recognizing Classes
+
+**Problem**: IDE shows errors but code compiles.
+
+**Solutions**:
+
+1. **IntelliJ IDEA**
+   - File > Invalidate Caches > Invalidate and Restart
+   - Reimport Gradle/Maven project
+   - Check Project Structure > SDKs
+
+2. **VS Code**
+   - Reload Java projects
+   - Check Java extension settings
+   - Verify language server is running
+
+## Networking Issues
+
+### SRV Records Not Working
+
+**Problem**: SRV records don't resolve.
+
+**Solution**:
+> "SRV records NOT supported initially (A records only)" - From Discord
+
+Use A records or direct IP:Port connections.
+
+### Transfer Packet Issues
+
+**Problem**: Issues with server transfer functionality.
+
+**Solutions**:
+
+1. **Verify Signature**
+   - Always verify transfer packet signatures
+   - Prevents unauthorized transfers
+
+2. **Payload Size**
+   - Max 4KB payload
+   - Compress data if needed
+
+3. **Backend Setup**
+   - Still need proxies for load balancing
+   - Transfer packets don't replace proxies entirely
+
+## Database & Data
+
+### Data Not Persisting
+
+**Problem**: Player data or configuration not saving.
+
+**Solutions**:
+
+1. **File Permissions**
+   ```bash
+   # Check permissions
+   ls -la /path/to/server/
+
+   # Fix permissions
+   chown -R hytale:hytale /path/to/server/
+   chmod -R 755 /path/to/server/
+   ```
+
+2. **Serialization Issues**
+   - Verify JSON/YAML syntax
+   - Check for serialization errors in logs
+   - Test save/load cycle
+
+3. **Database Connection**
+   - Verify credentials
+   - Check connection string
+   - Ensure database server is running
+
+### Configuration Errors
+
+**Problem**: Config file not loading or causing errors.
+
+**Solutions**:
+
+1. **JSON Validation**
+   - Use JSON validator tool
+   - Check for syntax errors
+   - Verify proper escaping
+
+2. **Config Location**
+   - Verify config file is in correct location
+   - Check if server is reading from right path
+   - Look for typos in filename
+
+## Platform-Specific Issues
+
+### macOS Support
+
+**Status**: Delayed due to Apple code signing requirements.
+
+**Workaround**:
+- Use Windows or Linux for now
+- Wait for official macOS release
+- Community may provide unsigned builds (use at own risk)
+
+### Linux Issues
+
+**Flatpak Support**: Confirmed available
+
+```bash
+# Install via Flatpak
+flatpak install hytale-server
+```
+
+### FreeBSD
+
+**Status**: Community discussion, no official support yet.
+
+## Troubleshooting Checklist
+
+When encountering issues, check:
+
+- [ ] Server logs for error messages
+- [ ] Port 5520 is open and forwarded
+- [ ] Firewall allows traffic
+- [ ] Java version is compatible (17+)
+- [ ] Development mode is enabled (if using plugins)
+- [ ] Plugin is in correct folder (`/mods`)
+- [ ] Configuration files are valid JSON/YAML
+- [ ] Sufficient RAM allocated
+- [ ] Disk space available
+- [ ] Authentication services are online
+
+## Getting Help
+
+### Before Asking
+
+1. Check server logs
+2. Search this documentation
+3. Search Discord history
+4. Try basic troubleshooting steps
+
+### Where to Ask
+
+- **Discord**: Active community for real-time help
+- **GitHub Issues**: For plugin-specific problems
+- **Forums**: For detailed discussions
+
+### What to Include
+
+- Server version
+- Plugin version (if applicable)
+- Full error message from logs
+- Steps to reproduce
+- What you've already tried
+
+## Community Tips
+
+> "Always check logs first - 90% of issues are explained there" - Discord advice
+
+> "Port forwarding issues? Test with a different port first to verify your router config" - Troubleshooting tip
+
+> "Start with minimal plugins, then add one at a time to identify conflicts" - Plugin debugging
+
+## Next Steps
+
+- [Server Setup](/server-setup) - Proper server configuration
+- [Performance](/performance) - Optimization guides
+- [Plugin Development](/plugin-development) - Development best practices

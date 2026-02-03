@@ -1,0 +1,368 @@
+# Server Performance & Optimization
+
+This guide covers server performance tuning, memory management, and optimization strategies based on community testing and server analysis.
+
+## Memory Management
+
+### RAM Requirements
+
+Based on community testing:
+
+| Players | Recommended RAM | Notes |
+|---------|----------------|-------|
+| 1-5 | 4-8 GB | Comfortable for small groups |
+| 5-15 | 8-16 GB | May need tuning |
+| 15-30 | 16-32 GB | Active memory management needed |
+| 30+ | 32+ GB | Requires optimization |
+
+> "4 players flying in different directions crashed 8GB server" - Discord
+> "not yet, mine is consuming over 16gb of ram (+20 players online)" - Discord
+
+**Key insight**: RAM usage scales dramatically with player spread. Players exploring different areas load many chunks simultaneously.
+
+### Memory Leak Issues
+
+Memory leaks are a known issue in early builds. Common symptoms:
+
+```
+Server starting: 2GB used
+After 1 hour: 8GB used
+After 2 hours: 16GB used (server lag begins)
+After 3 hours: 32GB used (server crash)
+```
+
+**Mitigation strategies:**
+1. Schedule regular server restarts
+2. Reduce view distance
+3. Pre-generate worlds
+4. Limit player spread
+
+### Scheduled Restarts
+
+For production servers, schedule automatic restarts:
+
+```bash
+# Linux cron job - restart every 6 hours
+0 */6 * * * /path/to/restart-server.sh
+
+# restart-server.sh
+#!/bin/bash
+screen -S hytale -X stuff "stop^M"
+sleep 30
+cd /path/to/server
+java -Xms4G -Xmx16G -jar HytaleServer.jar
+```
+
+## JVM Tuning
+
+### Recommended JVM Flags
+
+**For G1GC (Java 25, general purpose):**
+```bash
+java \
+  -Xms4G \
+  -Xmx16G \
+  -XX:+UseG1GC \
+  -XX:MaxGCPauseMillis=200 \
+  -XX:+ParallelRefProcEnabled \
+  -XX:+UnlockExperimentalVMOptions \
+  -XX:+DisableExplicitGC \
+  -XX:G1NewSizePercent=30 \
+  -XX:G1MaxNewSizePercent=40 \
+  -XX:G1HeapRegionSize=8M \
+  -XX:G1ReservePercent=20 \
+  -XX:G1HeapWastePercent=5 \
+  -XX:G1MixedGCCountTarget=4 \
+  -XX:InitiatingHeapOccupancyPercent=15 \
+  -XX:G1MixedGCLiveThresholdPercent=90 \
+  -XX:G1RSetUpdatingPauseTimePercent=5 \
+  -XX:SurvivorRatio=32 \
+  -XX:+PerfDisableSharedMem \
+  -XX:MaxTenuringThreshold=1 \
+  -jar HytaleServer.jar
+```
+
+**For ZGC (Java 25, low-latency):**
+```bash
+java \
+  -Xms4G \
+  -Xmx16G \
+  -XX:+UseZGC \
+  -XX:+ZGenerational \
+  -XX:ConcGCThreads=2 \
+  -XX:+UnlockExperimentalVMOptions \
+  -XX:+DisableExplicitGC \
+  -jar HytaleServer.jar
+```
+
+> "I've seen ZGC recommended for Java 25, but mine was godawful taking 20gb of ram in 3 minutes" - Discord
+
+**ZGC Note**: ZGC trades CPU for lower pause times. It may use more memory. Test both and choose based on your hardware.
+
+### Memory Allocation Guidelines
+
+```bash
+# Minimum heap = maximum heap (prevents resizing overhead)
+-Xms4G -Xmx4G  # For 4GB allocation
+
+# Don't allocate more than 75% of system RAM
+# System: 32GB -> Max: 24GB for server
+-Xms8G -Xmx24G
+```
+
+## View Distance Optimization
+
+View distance has the largest impact on performance and memory.
+
+### Server Configuration
+
+In `config.json`:
+```json
+{
+  "MaxViewRadius": 12
+}
+```
+
+| View Distance | Impact | Recommendation |
+|---------------|--------|----------------|
+| 32 (default) | Very high memory | Not recommended |
+| 16-20 | High memory | Large servers with lots of RAM |
+| 10-12 | Moderate | Good balance |
+| 5-8 | Low | Memory-constrained setups |
+
+> "If you lower the world distance from 12 to 5 fixes most issues" - Discord
+
+### Per-World Settings
+
+Consider different view distances for different world types:
+- Lobby: 5-8 (low traffic, small area)
+- Survival: 10-12 (exploration-focused)
+- Minigames: 8-10 (contained areas)
+
+## World Pre-Generation
+
+Pre-generating worlds prevents memory spikes from exploration:
+
+```bash
+# Use worldborder or pregenerator plugin
+# Set world boundary first, then pre-generate all chunks
+```
+
+**Benefits:**
+- Eliminates terrain generation CPU spikes
+- Reduces memory spikes from new chunk loading
+- Consistent server performance
+- Faster player chunk loading
+
+## Module Management
+
+Hytale servers have 70+ modules. Disable unused ones:
+
+```json
+// In config.json
+{
+  "modules": {
+    "weather": { "enabled": false },
+    "portals": { "enabled": false },
+    "parkour": { "enabled": false }
+  }
+}
+```
+
+**Common modules to disable:**
+- `weather` - If using custom weather system
+- `portals` - If not using portal mechanics
+- `parkour` - If not using parkour features
+- `npc*` - If using custom NPC system
+
+## Chunk Management
+
+### Chunk Unloading
+
+Ensure chunks unload properly:
+- Monitor loaded chunk count
+- Identify areas holding chunks loaded
+- Consider chunk unloading plugins
+
+### Region Locking
+
+> "When a chunk is being ticked, all other chunks within a certain radius are locked" - From decompiled source
+
+This means:
+- Players spread across world = more lock contention
+- Clustering players = better performance
+- Consider world partitioning for large servers
+
+## Network Optimization
+
+### Rate Limiting
+
+Default configuration (from `HytaleServerConfig.java`):
+```json
+{
+  "rateLimitConfig": {
+    "packetsPerSecond": 2000,
+    "burstCapacity": 500
+  }
+}
+```
+
+### Connection Timeouts
+
+```json
+{
+  "connectionTimeouts": {
+    "initial": "PT10S",    // 10 seconds
+    "auth": "PT30S",       // 30 seconds
+    "play": "PT1M"         // 1 minute
+  }
+}
+```
+
+Adjust based on your network quality and player base.
+
+## Plugin Performance
+
+### Event Handler Optimization
+
+```java
+// WRONG - Heavy work in sync event
+getEventRegistry().register(PlayerMoveEvent.class, event -> {
+    database.savePosition(event.getPlayer());  // Blocking!
+});
+
+// CORRECT - Async for heavy work
+getEventRegistry().registerAsync(PlayerMoveEvent.class, event -> {
+    CompletableFuture.runAsync(() -> {
+        database.savePosition(event.getPlayer());
+    });
+});
+```
+
+### Batch Operations
+
+```java
+// WRONG - Individual operations
+for (Player player : players) {
+    database.save(player);  // N database calls
+}
+
+// CORRECT - Batch
+database.saveAll(players);  // 1 database call
+```
+
+### Caching
+
+```java
+// Cache frequently accessed data
+private final Map<UUID, PlayerData> cache = new ConcurrentHashMap<>();
+
+public PlayerData getPlayerData(UUID uuid) {
+    return cache.computeIfAbsent(uuid, id -> database.load(id));
+}
+```
+
+## Monitoring
+
+### Built-in Metrics
+
+Check server metrics:
+```
+/tps           - Ticks per second (target: 30)
+/mem           - Memory usage
+/players       - Online player count
+```
+
+### External Monitoring
+
+Consider monitoring:
+- CPU usage per core
+- Memory usage over time
+- Disk I/O
+- Network bandwidth
+- GC pause times
+
+### Performance Profiling
+
+For deep analysis:
+1. Enable JFR (Java Flight Recorder)
+   ```bash
+   java -XX:StartFlightRecording=duration=60s,filename=profile.jfr -jar HytaleServer.jar
+   ```
+
+2. Analyze with JDK Mission Control or similar tools
+
+## Hardware Recommendations
+
+### CPU
+
+| Server Size | Recommended |
+|-------------|-------------|
+| Small (1-10) | 2-4 cores |
+| Medium (10-50) | 4-8 cores |
+| Large (50+) | 8+ cores |
+
+> "I'm using a 5900X and the game sips CPU. I'm generally idling at half a CPU core." - Discord
+
+Single-thread performance matters more than core count for main tick.
+
+### Storage
+
+- **SSD required** for chunk I/O
+- NVMe recommended for large worlds
+- Avoid network storage (NFS, etc.)
+
+### Network
+
+- Low latency > high bandwidth
+- 100Mbps sufficient for most servers
+- Consider DDoS protection for public servers
+
+## Quick Optimization Checklist
+
+1. [ ] Set `MaxViewRadius` to 10-12
+2. [ ] Use G1GC or ZGC with proper flags
+3. [ ] Pre-generate worlds
+4. [ ] Schedule regular restarts
+5. [ ] Disable unused modules
+6. [ ] Use async for heavy plugin operations
+7. [ ] Monitor memory growth over time
+8. [ ] Profile if experiencing lag
+9. [ ] Consider chunk management plugins
+10. [ ] Set up external monitoring
+
+## Troubleshooting
+
+### High Memory, Low Player Count
+
+**Possible causes:**
+- Memory leak (restart helps temporarily)
+- Large view distance
+- Too many loaded chunks
+- Plugin memory leak
+
+**Solutions:**
+1. Reduce view distance
+2. Check plugin memory usage
+3. Schedule restarts
+4. Update to latest server version
+
+### Random Lag Spikes
+
+**Possible causes:**
+- GC pauses
+- Chunk generation
+- Plugin sync operations
+- Disk I/O
+
+**Solutions:**
+1. Check GC logs
+2. Pre-generate world
+3. Profile plugins
+4. Move to SSD
+
+## Next Steps
+
+- [Server Setup](/server-setup) - Initial configuration
+- [Hosting Providers](/server-setup/hosting-providers) - Hosting options
+- [Common Issues](/common-issues) - Troubleshooting

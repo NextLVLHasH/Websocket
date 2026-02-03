@@ -1,0 +1,582 @@
+# Event System
+
+Hytale's event system allows plugins to respond to game events. The system supports both synchronous and asynchronous events, as well as special ECS-based events.
+
+## Event Types
+
+Based on the decompiled source code, Hytale has several categories of events:
+
+### Regular Events (IBaseEvent/ICancellable)
+
+Standard events that can be registered with simple listeners:
+
+**Player Events:**
+- **PlayerConnectEvent** - Player joins server (`getHolder()`, `getPlayerRef()`, `getWorld()`)
+- **PlayerDisconnectEvent** - Player leaves server
+- **PlayerReadyEvent** - Player finished loading (recommended for welcome messages)
+- **PlayerChatEvent** - Chat messages (async, cancellable) - `getSender()`, `getContent()`, `getTargets()`
+- **PlayerInteractEvent** - Player interaction with entities/blocks
+- **PlayerMouseButtonEvent** - Mouse button clicks (known issues)
+- **PlayerMouseMotionEvent** - Mouse movement
+- **AddPlayerToWorldEvent** - Player added to world
+- **DrainPlayerFromWorldEvent** - Player removed from world
+- **ChangeGameModeEvent** - Game mode changed
+
+**Permission Events:**
+- **PlayerPermissionChangeEvent** - Player permission modified
+- **PlayerGroupEvent** - Player group changed
+- **GroupPermissionChangeEvent** - Group permission modified
+
+**Inventory Events:**
+- **LivingEntityInventoryChangeEvent** - Inventory changed
+- **CraftRecipeEvent** - Recipe crafted
+- **InteractivelyPickupItemEvent** - Item picked up
+- **DropItemEvent** - Item dropped
+
+**World Events:**
+- **DiscoverZoneEvent** - Zone discovered
+- **StartWorldEvent** - World initialization
+- **WorldPathChangedEvent** - World waypoints changed
+
+### ECS Events (CancellableEcsEvent)
+
+Events that require the ECS system pattern with `EntityEventSystem`:
+
+- **BreakBlockEvent** - Block breaking (cancellable) - `getTargetBlock()`, `getBlockType()`, `getItemInHand()`
+- **PlaceBlockEvent** - Block placement (cancellable)
+- **UseBlockEvent** - Block interaction (cancellable)
+- **DamageBlockEvent** - Block damage
+- **DamageEvent** - Damage events (requires DamageModule)
+- **DeathEvent** - Player/entity death (requires DamageModule)
+- **EntityRemoveEvent** - Entity removed from world
+
+### Event Priorities
+
+The `EventPriority` enum controls listener execution order:
+
+| Priority | Order |
+|----------|-------|
+| `LOWEST` | First |
+| `LOW` | Second |
+| `NORMAL` | Default |
+| `HIGH` | Fourth |
+| `HIGHEST` | Last |
+
+```java
+getEventRegistry().register(EventPriority.HIGH, PlayerReadyEvent.class, event -> {
+    // Runs after NORMAL priority listeners
+});
+```
+
+## Event Registration
+
+### Three Registration Methods
+
+#### 1. register() - For Synchronous Events
+
+```java
+getEventRegistry().register(PlayerReadyEvent.class, event -> {
+    event.getPlayer().sendMessage(Message.raw("Welcome!"));
+});
+```
+
+#### 2. registerAsync() / registerAsyncGlobal() - For Async Events
+
+PlayerChatEvent is asynchronous and MUST use async registration:
+
+```java
+getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, future -> {
+    future.thenAccept(event -> {
+        PlayerRef sender = event.getSender();
+        String message = event.getMessage();
+        System.out.println("Chat: " + message);
+    });
+});
+```
+
+#### 3. registerGlobal() - Global Event Registration
+
+```java
+getEventRegistry().registerGlobal(PlayerReadyEvent.class, ExampleEvent::onPlayerReady);
+
+// Static method in ExampleEvent class
+public static void onPlayerReady(final PlayerReadyEvent event) {
+    final Player player = event.getPlayer();
+    player.sendMessage(Message.raw("Welcome to the server!"));
+}
+```
+
+## ECS Event System
+
+ECS events like `BreakBlockEvent` cannot be registered like normal events. They require extending `EntityEventSystem`:
+
+### BlockBreakEvent Example
+
+```java
+public class BlockBreakSystem extends EntityEventSystem\<EntityStore, BreakBlockEvent\> {
+
+    public BlockBreakSystem() {
+        super(BreakBlockEvent.class);
+    }
+
+    @Override
+    public void handle(int i,
+                       @Nonnull ArchetypeChunk\<EntityStore\> archetypeChunk,
+                       @Nonnull Store\<EntityStore\> store,
+                       @Nonnull CommandBuffer\<EntityStore\> commandBuffer,
+                       @Nonnull BreakBlockEvent event) {
+
+        // IMPORTANT: Skip air blocks
+        if (event.getBlockType() == BlockType.EMPTY) return;
+
+        // Get player from ECS
+        Ref\<EntityStore\> ref = archetypeChunk.getReferenceTo(i);
+        Player player = store.getComponent(ref, Player.getComponentType());
+
+        if (player == null) return;
+
+        // Send message
+        player.sendMessage(Message.raw("You broke: " + event.getBlockType().getId()));
+    }
+
+    @Nullable
+    @Override
+    public Query\<EntityStore\> getQuery() {
+        return PlayerRef.getComponentType();
+    }
+}
+
+// Register in your plugin's setup() method:
+@Override
+protected void setup() {
+    getEntityStoreRegistry().registerSystem(new BlockBreakSystem());
+}
+```
+
+## Event Examples
+
+### Player Join Event
+
+```java
+@Override
+protected void setup() {
+    getEventRegistry().registerGlobal(PlayerReadyEvent.class, event -> {
+        Player player = event.getPlayer();
+        player.sendMessage(Message.raw("Welcome to the server!"));
+
+        // Log to console
+        getLogger().atInfo().log("Player joined: " + player.getName());
+    });
+}
+```
+
+### Chat Event (Async)
+
+```java
+@Override
+protected void setup() {
+    getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, future -> {
+        future.thenAccept(event -> {
+            // Cancel event if message contains spam
+            if (event.getMessage().contains("spam")) {
+                event.cancel();
+                return;
+            }
+
+            // Modify message
+            String modified = "[Player] " + event.getMessage();
+            // Process modified message
+        });
+    });
+}
+```
+
+### Player Disconnect Event
+
+```java
+getEventRegistry().register(PlayerDisconnectEvent.class, event -> {
+    Player player = event.getPlayer();
+    getLogger().atInfo().log("Player left: " + player.getName());
+
+    // Save player data
+    savePlayerData(player);
+});
+```
+
+### Death Event (ECS)
+
+```java
+public class DeathSystem extends EntityEventSystem\<EntityStore, DeathEvent\> {
+
+    public DeathSystem() {
+        super(DeathEvent.class);
+    }
+
+    @Override
+    public void handle(int i,
+                       @Nonnull ArchetypeChunk\<EntityStore\> chunk,
+                       @Nonnull Store\<EntityStore\> store,
+                       @Nonnull CommandBuffer\<EntityStore\> buffer,
+                       @Nonnull DeathEvent event) {
+
+        Ref\<EntityStore\> ref = chunk.getReferenceTo(i);
+        Player player = store.getComponent(ref, Player.getComponentType());
+
+        if (player != null) {
+            player.sendMessage(Message.raw("You died!"));
+        }
+    }
+
+    @Nullable
+    @Override
+    public Query\<EntityStore\> getQuery() {
+        return PlayerRef.getComponentType();
+    }
+}
+
+// Don't forget to add dependency in manifest.json:
+// "Dependencies": { "Hytale:DamageModule": "*" }
+```
+
+## Getting Player Information from Events
+
+A common challenge is accessing player data from events. Here are patterns discovered from the decompiled source:
+
+### Getting Player UUID
+
+```java
+// Method 1: From PlayerRef component (recommended for ECS contexts)
+UUID uuid = event.getPlayerRef()
+    .getStore()
+    .getComponent(event.getPlayerRef(), PlayerRef.getComponentType())
+    .getUuid();
+
+// Method 2: From Player object directly
+Player player = event.getPlayer();
+UUID uuid = player.getUuid();
+
+// Method 3: Using Universe (if you only have username/uuid)
+Player player = Universe.get().getPlayer(uuid);
+```
+
+### Getting Player from ECS Events
+
+For ECS events like `BreakBlockEvent`, you cannot use `event.getPlayer()` directly:
+
+```java
+// In EntityEventSystem handle() method:
+Ref<EntityStore> ref = archetypeChunk.getReferenceTo(i);
+Player player = store.getComponent(ref, Player.getComponentType());
+
+// Get player's transform (position)
+TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+```
+
+### Getting World and Store References
+
+```java
+// From player reference
+Ref<EntityStore> playerRef = player.getReference();
+World world = player.getWorld();
+Store<EntityStore> store = world.getEntityStore().getStore();
+
+// Get transform component
+TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
+```
+
+## Async Event Registration Pitfalls
+
+Understanding the differences between registration methods is critical for avoiding bugs.
+
+### Registration Method Comparison
+
+| Method | Thread | Use Case |
+|--------|--------|----------|
+| `register()` | World thread | Sync events, component access safe |
+| `registerAsync()` | Async thread | Async events, NO direct component access |
+| `registerAsyncGlobal()` | Async thread | Async events, global (all worlds) |
+| `registerAsyncUnhandled()` | Async thread | Async events, for mods to extend |
+| `registerGlobal()` | World thread | Sync events, global (all worlds) |
+
+### Critical: Component Access in Async Events
+
+> "is it possible to retrieve components in async events? I always run into thread exception" - Discord
+
+When using `registerAsync()` or `registerAsyncGlobal()`, you **cannot** directly access ECS components:
+
+```java
+// WRONG - Will throw "Assert not in thread!" error
+getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, future -> {
+    future.thenAccept(event -> {
+        Player player = event.getPlayer();
+        World world = player.getWorld();
+        Store<EntityStore> store = player.getRef().getStore();
+
+        // THIS CRASHES - Wrong thread!
+        CustomComponent comp = store.getComponent(player.getRef(), CustomComponent.getComponentType());
+    });
+});
+
+// CORRECT - Use world.execute() to access components
+getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, future -> {
+    future.thenAccept(event -> {
+        Player player = event.getPlayer();
+        World world = player.getWorld();
+
+        // Schedule component access on world thread
+        world.execute(() -> {
+            Store<EntityStore> store = player.getRef().getStore();
+            CustomComponent comp = store.getComponent(player.getRef(), CustomComponent.getComponentType());
+            // Safe to use component now
+        });
+    });
+});
+```
+
+### registerAsyncGlobal vs registerAsync
+
+- `registerAsyncGlobal()` - Listens for events from ALL worlds
+- `registerAsync()` - Listens for events from a specific world context
+
+For most cases, use `registerAsyncGlobal()` for async events like `PlayerChatEvent`.
+
+### registerAsyncUnhandled
+
+Use `registerAsyncUnhandled()` when you want other mods to be able to intercept the event:
+
+```java
+// Allows other mods to process the event first
+getEventRegistry().registerAsyncUnhandled(PlayerChatEvent.class, future -> {
+    future.thenAccept(event -> {
+        // Your handling - runs after other handlers
+    });
+});
+```
+
+## Important Notes from Community
+
+### PlayerChatEvent is Asynchronous
+
+> "PlayerChatEvent is asynchronous - you MUST use registerAsync or registerAsyncGlobal"
+
+This is a common mistake. Using `register()` instead of `registerAsync()` will not work.
+
+### No PlayerJoinEvent
+
+There is no `PlayerJoinEvent`. Use either:
+- **PlayerConnectEvent** - When player connects
+- **PlayerReadyEvent** - When player is ready (recommended)
+
+### BreakBlockEvent Fires for Air
+
+```java
+// ALWAYS check for empty blocks!
+if (event.getBlockType() == BlockType.EMPTY) return;
+```
+
+> "BreakBlockEvent fires even when you break air blocks" - Community testing
+
+### PlayerMouseButtonEvent Issues
+
+> "PlayerMouseButtonEvent has issues - multiple reports of it not firing properly"
+
+Known bug in early versions. May be fixed in later releases.
+
+### ECS Events Cannot Use Normal Registration
+
+```java
+// ❌ WRONG - This won't work for BreakBlockEvent
+getEventRegistry().register(BreakBlockEvent.class, event -> {
+    // This will never fire
+});
+
+// ✅ CORRECT - Use EntityEventSystem
+getEntityStoreRegistry().registerSystem(new BlockBreakSystem());
+```
+
+## Event Cancellation
+
+Cancellable events implement `ICancellable`:
+
+```java
+getEventRegistry().registerAsync(PlayerChatEvent.class, future -> {
+    future.thenAccept(event -> {
+        if (shouldCancel(event)) {
+            event.cancel(); // Prevent event from happening
+        }
+    });
+});
+```
+
+## Event Priorities
+
+While not explicitly documented, event order can matter:
+
+```java
+// Register multiple listeners for same event
+getEventRegistry().register(PlayerReadyEvent.class, this::firstHandler);
+getEventRegistry().register(PlayerReadyEvent.class, this::secondHandler);
+// Both will be called, order may not be guaranteed
+```
+
+## Performance Considerations
+
+### Use Async for Heavy Operations
+
+```java
+getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, future -> {
+    future.thenAcceptAsync(event -> {
+        // Heavy database operations
+        database.logChatMessage(event.getMessage());
+    }, executorService);
+});
+```
+
+### Avoid Blocking in Event Handlers
+
+```java
+// ❌ BAD - Blocking main thread
+getEventRegistry().register(PlayerReadyEvent.class, event -> {
+    Thread.sleep(1000); // DON'T DO THIS
+});
+
+// ✅ GOOD - Run async if needed
+getEventRegistry().register(PlayerReadyEvent.class, event -> {
+    CompletableFuture.runAsync(() -> {
+        // Long operation
+    });
+});
+```
+
+## Module Dependencies
+
+Some events require specific modules to be loaded:
+
+**manifest.json:**
+```json
+{
+  "dependencies": [
+    "Hytale:DamageModule"
+  ]
+}
+```
+
+Required for:
+- `DeathEvent`
+- `DamageEvent`
+
+## Debugging Events
+
+### Check if Events are Firing
+
+```java
+@Override
+protected void setup() {
+    getEventRegistry().register(PlayerReadyEvent.class, event -> {
+        getLogger().atInfo().log("PlayerReadyEvent fired!");
+        System.out.println("Event: " + event);
+    });
+}
+```
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Chat event not firing | Use `registerAsync()` not `register()` |
+| Break block event not firing | Use `EntityEventSystem` pattern |
+| Events fire multiple times | Check you're not registering twice |
+| Death event not working | Add `Hytale:DamageModule` dependency |
+
+## Best Practices
+
+### 1. Register in setup()
+
+```java
+@Override
+protected void setup() {
+    // Register all events here
+    getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onJoin);
+}
+```
+
+### 2. Clean Up in shutdown()
+
+```java
+@Override
+protected void shutdown() {
+    // Unregister events if needed
+    // Most cleanup is automatic
+}
+```
+
+### 3. Use Method References
+
+```java
+// Clean and readable
+getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::handleJoin);
+
+private void handleJoin(PlayerReadyEvent event) {
+    // Handler logic
+}
+```
+
+### 4. Separate Event Handlers
+
+```java
+public class EventHandlers {
+    public static void onPlayerReady(PlayerReadyEvent event) {
+        // Handle join
+    }
+
+    public static void onPlayerLeave(PlayerDisconnectEvent event) {
+        // Handle leave
+    }
+}
+
+// Register
+getEventRegistry().registerGlobal(PlayerReadyEvent.class, EventHandlers::onPlayerReady);
+```
+
+## Complete Event Handler Example
+
+```java
+public class MyPlugin extends JavaPlugin {
+
+    @Override
+    protected void setup() {
+        // Regular events
+        getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onJoin);
+        getEventRegistry().register(PlayerDisconnectEvent.class, this::onLeave);
+
+        // Async events
+        getEventRegistry().registerAsyncGlobal(PlayerChatEvent.class, future -> {
+            future.thenAccept(this::onChat);
+        });
+
+        // ECS events
+        getEntityStoreRegistry().registerSystem(new BlockBreakSystem());
+        getEntityStoreRegistry().registerSystem(new DeathSystem());
+    }
+
+    private void onJoin(PlayerReadyEvent event) {
+        Player player = event.getPlayer();
+        player.sendMessage(Message.raw("Welcome!"));
+    }
+
+    private void onLeave(PlayerDisconnectEvent event) {
+        Player player = event.getPlayer();
+        getLogger().atInfo().log(player.getName() + " left");
+    }
+
+    private void onChat(PlayerChatEvent event) {
+        // Chat handling
+    }
+}
+```
+
+## Next Steps
+
+- [ECS Architecture](/plugin-development/ecs-architecture) - Deep dive into ECS
+- [Commands](/plugin-development/commands) - Create custom commands
+- [Complete Examples](/plugin-development/examples) - Full plugin examples

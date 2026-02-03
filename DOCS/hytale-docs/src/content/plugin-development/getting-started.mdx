@@ -1,0 +1,592 @@
+# Getting Started with Plugin Development
+
+Welcome to Hytale plugin development! This guide will help you create your first plugin.
+
+## Prerequisites
+
+### Required Tools
+
+- **Java Development Kit (JDK) 25** - Hytale requires Java 25 for full plugin support
+- **IntelliJ IDEA or Eclipse** - Recommended IDEs
+- **Gradle** - Build system (included in project)
+- **Git** - Version control
+- **HytaleServer.jar** - Required as compile dependency (no public Maven repo yet)
+
+> "why 21? it says 25 in the docs" - Common confusion from Discord. **Use Java 25.**
+
+See [Java Version Requirements](/getting-started/java-version) for installation instructions.
+
+### Knowledge Requirements
+
+- Java programming fundamentals
+- Basic understanding of object-oriented programming
+- Familiarity with event-driven architecture (helpful)
+
+### Alternative Languages
+
+**Kotlin Support:**
+Kotlin is fully compatible with Hytale plugins since both Java and Kotlin compile to JVM bytecode.
+
+> "If it supports Java, it also supports Kotlin" - Community consensus
+
+**Benefits of Kotlin:**
+- Null safety
+- Extension functions
+- Less boilerplate
+- Modern syntax
+
+**Important:** When using Kotlin, you must shade the Kotlin standard library into your JAR:
+
+```kotlin
+// build.gradle.kts
+plugins {
+    kotlin("jvm") version "1.9.0"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
+}
+
+tasks.shadowJar {
+    // Include Kotlin runtime
+}
+```
+
+## Development Environment Setup
+
+### 1. Install JDK 25
+
+**Windows:**
+```bash
+# Download from Oracle or Adoptium
+# Or use Chocolatey
+choco install openjdk --version=25
+```
+
+**Mac:**
+```bash
+# Using Homebrew
+brew install openjdk@25
+
+# Link it
+sudo ln -sfn /opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-25.jdk
+```
+
+**Linux:**
+```bash
+# Ubuntu/Debian
+sudo apt install openjdk-25-jdk
+
+# Or using SDKMAN (recommended for managing versions)
+sdk install java 25-open
+```
+
+See [Java Version Requirements](/getting-started/java-version) for detailed installation guides.
+
+### 2. Set Up IDE
+
+**IntelliJ IDEA (Recommended):**
+1. Download IntelliJ IDEA Community Edition
+2. Install Gradle plugin
+3. Configure JDK 25 in Project Structure > SDKs
+
+**Eclipse:**
+1. Download Eclipse IDE for Java Developers
+2. Install Buildship Gradle plugin
+3. Configure JDK 25 in Installed JREs
+
+### 3. Create Hytale Server
+
+Download Hytale Server from official sources:
+```bash
+# Extract server files
+unzip hytale-server.zip
+
+# Run server once to generate files
+cd hytale-server
+./start.sh
+```
+
+## Creating Your First Plugin
+
+### Project Structure
+
+```
+MyPlugin/
+├── src/
+│   └── main/
+│       ├── java/
+│       │   └── com/
+│       │       └── example/
+│       │           └── myplugin/
+│       │               └── MyPlugin.java
+│       └── resources/
+│           └── manifest.json
+├── build.gradle
+└── settings.gradle
+```
+
+### 1. Initialize Gradle Project
+
+**build.gradle:**
+```gradle
+plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    // Note: No official Hytale Maven repository exists yet
+}
+
+dependencies {
+    // Use local HytaleServer.jar - copy from your server installation to libs/
+    compileOnly files('libs/HytaleServer.jar')
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    archiveBaseName = 'MyPlugin'
+    archiveVersion = project.version
+}
+```
+
+**Getting HytaleServer.jar:**
+```bash
+# Windows
+copy "%APPDATA%\Hytale\install\release\package\game\latest\Server\HytaleServer.jar" libs\
+
+# Linux/macOS
+cp ~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/install/release/package/game/latest/Server/HytaleServer.jar libs/
+```
+
+> **Important**: There is no official Maven repository for the Hytale API yet. You must use the local JAR from your server installation as a `compileOnly` dependency.
+
+**settings.gradle:**
+```gradle
+rootProject.name = 'MyPlugin'
+```
+
+### 2. Create Plugin Manifest
+
+The manifest.json file is required in your plugin JAR root. This format was confirmed from the decompiled server source code.
+
+**src/main/resources/manifest.json:**
+```json
+{
+  "Group": "com.example",
+  "Name": "MyPlugin",
+  "Version": "1.0.0",
+  "Description": "My first Hytale plugin",
+  "Authors": [
+    {
+      "Name": "NextLVLHasH"
+    }
+  ],
+  "Main": "com.example.myplugin.MyPlugin",
+  "ServerVersion": "*",
+  "Dependencies": {},
+  "IncludesAssetPack": false
+}
+```
+
+**Manifest Fields Explained:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `Group` | Yes | Plugin group/namespace (e.g., `com.example`) |
+| `Name` | Yes | Plugin name |
+| `Version` | Yes | Semantic version (e.g., `1.0.0`) |
+| `Description` | No | Plugin description |
+| `Authors` | No | Array of author objects with `Name` field |
+| `Main` | Yes | Fully qualified main class name |
+| `ServerVersion` | No | Server version requirements (`*` for any) |
+| `Dependencies` | No | Map of plugin dependencies with version ranges |
+| `OptionalDependencies` | No | Optional plugin dependencies |
+| `LoadBefore` | No | Plugins this should load before |
+| `DisabledByDefault` | No | If true, plugin must be enabled manually |
+| `IncludesAssetPack` | No | Set to `true` if plugin includes custom assets |
+
+**Example with Dependencies:**
+```json
+{
+  "Group": "com.example",
+  "Name": "MyPlugin",
+  "Version": "1.0.0",
+  "Main": "com.example.myplugin.MyPlugin",
+  "ServerVersion": "2026.1.*",
+  "Dependencies": {
+    "Hytale:DamageModule": "*"
+  },
+  "OptionalDependencies": {
+    "SomePlugin:Economy": ">=1.0.0"
+  }
+}
+```
+
+### 3. Create Main Plugin Class
+
+**src/main/java/com/example/myplugin/MyPlugin.java:**
+```java
+package com.example.myplugin;
+
+import com.hytale.api.plugin.JavaPlugin;
+import com.hytale.api.event.player.PlayerReadyEvent;
+import com.hytale.api.message.Message;
+
+public class MyPlugin extends JavaPlugin {
+
+    @Override
+    protected void setup() {
+        getLogger().atInfo().log("Setting up MyPlugin...");
+
+        // Register event listener
+        getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onPlayerReady);
+
+        // Register command
+        getCommandRegistry().registerCommand(new HelloCommand());
+    }
+
+    @Override
+    protected void start() {
+        getLogger().atInfo().log("MyPlugin started successfully!");
+    }
+
+    @Override
+    protected void shutdown() {
+        getLogger().atInfo().log("MyPlugin shutting down...");
+    }
+
+    private void onPlayerReady(PlayerReadyEvent event) {
+        event.getPlayer().sendMessage(
+            Message.raw("Welcome to the server!")
+        );
+    }
+}
+```
+
+### 4. Create a Simple Command
+
+**HelloCommand.java:**
+```java
+package com.example.myplugin;
+
+import com.hytale.api.command.CommandBase;
+import com.hytale.api.command.CommandSender;
+import com.hytale.api.entity.player.Player;
+import com.hytale.api.message.Message;
+
+public class HelloCommand extends CommandBase {
+
+    @Override
+    public String getName() {
+        return "hello";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Say hello!";
+    }
+
+    @Override
+    public void execute(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("Only players can use this command");
+            return;
+        }
+
+        Player player = (Player) sender;
+        player.sendMessage(Message.raw("Hello, " + player.getName() + "!"));
+    }
+}
+```
+
+## Building Your Plugin
+
+### Using Gradle
+
+```bash
+# Build the plugin
+./gradlew build
+
+# Output location
+# build/libs/MyPlugin-1.0.0.jar
+```
+
+### Manual Build (IntelliJ)
+
+1. Build > Build Project
+2. Find JAR in `out/artifacts/` or `build/libs/`
+
+## Installing Your Plugin
+
+### 1. Copy to Server
+
+```bash
+# Copy JAR to server mods directory
+cp build/libs/MyPlugin-1.0.0.jar /path/to/hytale-server/mods/
+```
+
+### 2. Start Server
+
+```bash
+cd /path/to/hytale-server
+./start.sh
+```
+
+### 3. Verify Plugin Loaded
+
+Check server console for:
+```
+[INFO] Setting up MyPlugin...
+[INFO] MyPlugin started successfully!
+```
+
+## Testing Your Plugin
+
+### 1. Join Server
+
+Connect to your server using Hytale client:
+```
+localhost:5520
+```
+
+### 2. Test Welcome Message
+
+When you join, you should see:
+```
+Welcome to the server!
+```
+
+### 3. Test Command
+
+In game chat:
+```
+/hello
+```
+
+Expected output:
+```
+Hello, NextLVLHasH!
+```
+
+## Development Workflow
+
+### Hot Reload Limitations
+
+> "Most developers restart server for testing" - Community consensus from Discord
+
+**Important**: Native hot-reload for plugins is currently broken. The `/plugin reload` command often causes `ZipException` errors. The recommended workflow is:
+
+**Standard Workflow:**
+```bash
+# 1. Make code changes
+# 2. Build
+./gradlew build
+
+# 3. Stop server
+# (In server console: stop)
+
+# 4. Copy JAR to server
+cp build/libs/MyPlugin-1.0.0.jar /path/to/server/mods/
+
+# 5. Start server
+cd /path/to/server && java -jar HytaleServer.jar
+```
+
+### HotSwap for Development
+
+For faster iteration during development, use external HotSwap tools:
+
+1. **DCEVM/JBR** - Enhanced JVM with better hotswap support
+2. **HotSwapAgent** - Plugin for runtime class reloading
+
+```bash
+# Start server with remote debugging
+java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005 \
+     -XX:+AllowEnhancedClassRedefinition \
+     -jar HytaleServer.jar
+```
+
+This allows minor code changes to be applied without full restart (method body changes only).
+
+### Debugging
+
+**IntelliJ Remote Debugging:**
+
+1. Add to server start script:
+```bash
+java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005 -jar hytale-server.jar
+```
+
+2. In IntelliJ: Run > Edit Configurations > Add Remote JVM Debug
+3. Set port to 5005
+4. Start debugging session
+
+## Common First Plugin Ideas
+
+### 1. Welcome Plugin
+- Welcome message on join
+- Configurable message
+- Permission-based VIP message
+
+### 2. Simple Teleport
+- /spawn command
+- /sethome and /home commands
+- Save locations to file
+
+### 3. Player Stats
+- Track kills/deaths
+- Display on command
+- Save to database
+
+### 4. Chat Features
+- Custom chat format
+- Colored names by rank
+- Chat filter
+
+### 5. Admin Tools
+- /heal command
+- /feed command
+- /fly command
+
+## Plugin Architecture Best Practices
+
+### 1. Separate Concerns
+
+```
+myplugin/
+├── MyPlugin.java          # Main class
+├── commands/              # All commands
+│   ├── HelloCommand.java
+│   └── SpawnCommand.java
+├── listeners/             # Event handlers
+│   └── PlayerListener.java
+├── data/                  # Data management
+│   ├── DataStore.java
+│   └── PlayerData.java
+└── config/               # Configuration
+    └── ConfigManager.java
+```
+
+### 2. Use Services
+
+```java
+@Override
+protected void setup() {
+    // Register services for other plugins to use
+    registerService(new EconomyService());
+    registerService(new PermissionService());
+}
+```
+
+### 3. Handle Errors Gracefully
+
+```java
+@Override
+public void execute(CommandSender sender, String[] args) {
+    try {
+        // Command logic
+    } catch (Exception e) {
+        sender.sendMessage("An error occurred");
+        getLogger().atSevere().log("Command error", e);
+    }
+}
+```
+
+### 4. Use Async for Heavy Operations
+
+```java
+CompletableFuture.runAsync(() -> {
+    // Load data from database
+}).thenAccept(data -> {
+    // Update player on main thread
+});
+```
+
+## Next Steps
+
+Now that you have your first plugin running:
+
+1. **Learn Event System** - [Event System](/plugin-development/event-system)
+2. **Create Commands** - [Commands](/plugin-development/commands)
+3. **Understand ECS** - [ECS Architecture](/plugin-development/ecs-architecture)
+4. **Add Configuration** - [Configuration](/plugin-development/configuration)
+5. **Implement Permissions** - [Permissions](/plugin-development/permissions)
+6. **Study Examples** - [Complete Examples](/plugin-development/examples)
+
+## Troubleshooting
+
+### Plugin Not Loading
+
+**Check manifest.json:**
+- Correct main class path
+- Valid JSON format
+- Dependencies listed correctly
+
+**Check logs:**
+```bash
+tail -f logs/latest.log
+```
+
+### ClassNotFoundException
+
+- Ensure all dependencies in build.gradle
+- Verify main class package matches manifest
+
+### Events Not Firing
+
+- Check event is registered in setup()
+- Verify correct event type
+- Check if dependencies required (e.g., DamageModule)
+
+## Community Resources
+
+- **Discord** - Active community for questions
+- **GitHub** - Example plugins and libraries
+- **Documentation** - This site!
+
+## Development Tips
+
+1. **Start Simple** - Don't try to build everything at once
+2. **Test Frequently** - Use hot reload to iterate quickly
+3. **Read Examples** - Study existing plugins
+4. **Ask Questions** - Community is helpful
+5. **Version Control** - Use Git from the start
+6. **Document Code** - Future you will thank you
+
+## Example Development Session
+
+```bash
+# 1. Create project
+mkdir MyPlugin && cd MyPlugin
+gradle init
+
+# 2. Add dependencies to build.gradle
+# 3. Create manifest.json
+# 4. Write MyPlugin.java
+
+# 5. Build
+./gradlew build
+
+# 6. Copy to server
+cp build/libs/MyPlugin-1.0.0.jar ~/hytale-server/mods/
+
+# 7. Test
+cd ~/hytale-server
+./start.sh
+
+# 8. Verify in logs
+tail -f logs/latest.log | grep MyPlugin
+```
+
+Ready to dive deeper? Check out the [Event System](/plugin-development/event-system) to learn about handling game events!

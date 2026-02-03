@@ -1,0 +1,459 @@
+# Permissions
+
+Hytale has a built-in permission system for controlling access to commands and features.
+
+## Native Permission System
+
+Hytale includes a native permission system - no LuckPerms required initially:
+
+> "Simon did mention something about perms" - Community member
+
+> "Permissions is relatively simple, we will have good ones Day one" - Discussion
+
+## Permission Structure
+
+### permissions.json
+
+```json
+{
+  "groups": [
+    "OP",
+    "Adventure",
+    "Builder",
+    "Moderator",
+    "Admin"
+  ]
+}
+```
+
+### Group-Based Permissions
+
+```json
+{
+  "groups": {
+    "default": {
+      "permissions": [
+        "myplugin.use",
+        "myplugin.home",
+        "myplugin.warp"
+      ]
+    },
+    "vip": {
+      "inherits": ["default"],
+      "permissions": [
+        "myplugin.sethome.multiple",
+        "myplugin.fly"
+      ]
+    },
+    "moderator": {
+      "inherits": ["vip"],
+      "permissions": [
+        "myplugin.kick",
+        "myplugin.mute",
+        "myplugin.warn"
+      ]
+    },
+    "admin": {
+      "inherits": ["moderator"],
+      "permissions": [
+        "myplugin.*",
+        "myplugin.ban",
+        "myplugin.reload"
+      ]
+    }
+  }
+}
+```
+
+## Checking Permissions
+
+### In Commands
+
+```java
+public class FlyCommand extends CommandBase {
+    
+    @Override
+    public void execute(CommandSender sender, String[] args) {
+        // Check permission
+        if (!sender.hasPermission("myplugin.fly")) {
+            sender.sendMessage("You don't have permission");
+            return;
+        }
+        
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("Only players can fly");
+            return;
+        }
+        
+        Player player = (Player) sender;
+        toggleFly(player);
+    }
+}
+```
+
+### In Event Handlers
+
+```java
+getEventRegistry().register(PlayerReadyEvent.class, event -> {
+    Player player = event.getPlayer();
+    
+    // Check permission
+    if (player.hasPermission("myplugin.vip")) {
+        player.sendMessage(Message.raw("Welcome, VIP!"));
+    }
+});
+```
+
+### Dynamic Permission Checks
+
+```java
+public boolean canUseFeature(Player player, String feature) {
+    String permission = "myplugin.feature." + feature;
+    return player.hasPermission(permission);
+}
+
+// Usage
+if (canUseFeature(player, "pvp")) {
+    // Allow PVP
+}
+```
+
+## Permission Nodes
+
+### Node Naming Convention
+
+```
+plugin.category.action
+plugin.category.*
+plugin.*
+```
+
+**Examples:**
+```
+myplugin.teleport.spawn
+myplugin.teleport.player
+myplugin.teleport.*
+
+myplugin.admin.ban
+myplugin.admin.kick
+myplugin.admin.*
+
+myplugin.*  (all permissions)
+```
+
+### Wildcard Permissions
+
+```java
+// Check for specific or wildcard
+if (player.hasPermission("myplugin.admin.ban") || 
+    player.hasPermission("myplugin.admin.*") ||
+    player.hasPermission("myplugin.*")) {
+    // Has permission
+}
+```
+
+## Permission Management
+
+### Built-in Commands
+
+Expected commands (may vary):
+```bash
+/permission add <player> <permission>
+/permission remove <player> <permission>
+/permission check <player> <permission>
+/permission group <player> <group>
+```
+
+### OP System
+
+```bash
+/op <player>      # Grant operator status
+/deop <player>    # Remove operator status
+```
+
+Operators typically have all permissions.
+
+## Web Integration
+
+### Service Accounts
+
+> "Integration with web authentication" - Community discussion
+
+> "Service accounts support (for APIs/bots)" - Features mentioned
+
+**Use Cases:**
+- Web dashboards
+- API access
+- Bot accounts
+- External integrations
+
+## Permission Features
+
+### Default Permissions
+
+```java
+public class MyPlugin extends JavaPlugin {
+    
+    @Override
+    protected void setup() {
+        // Register default permissions
+        registerDefaultPermissions();
+    }
+    
+    private void registerDefaultPermissions() {
+        // All players get these by default
+        addDefaultPermission("myplugin.use");
+        addDefaultPermission("myplugin.help");
+    }
+}
+```
+
+### Temporary Permissions
+
+```java
+// Grant temporary permission
+grantTempPermission(player, "myplugin.fly", Duration.ofHours(1));
+
+// Check and revoke
+if (hasExpired(player, "myplugin.fly")) {
+    revokePermission(player, "myplugin.fly");
+}
+```
+
+## Permission Inheritance
+
+### Group Hierarchy
+
+```
+Admin
+  └─ inherits from Moderator
+      └─ inherits from VIP
+          └─ inherits from Default
+```
+
+**Benefits:**
+- DRY (Don't Repeat Yourself)
+- Easy to manage
+- Clear hierarchy
+- Simpler configuration
+
+## Custom Permission System
+
+If you need more advanced features, create your own:
+
+```java
+public class PermissionManager {
+    private final Map<UUID, Set<String>> playerPermissions = new ConcurrentHashMap<>();
+    private final Map<String, Set<String>> groupPermissions = new HashMap<>();
+    
+    public boolean hasPermission(Player player, String permission) {
+        UUID uuid = player.getUuid();
+        
+        // Check player-specific permissions
+        Set<String> perms = playerPermissions.get(uuid);
+        if (perms != null && perms.contains(permission)) {
+            return true;
+        }
+        
+        // Check group permissions
+        String group = getPlayerGroup(player);
+        Set<String> groupPerms = groupPermissions.get(group);
+        if (groupPerms != null && groupPerms.contains(permission)) {
+            return true;
+        }
+        
+        // Check wildcard
+        return hasWildcard(player, permission);
+    }
+    
+    public void addPermission(UUID uuid, String permission) {
+        playerPermissions.computeIfAbsent(uuid, k -> new HashSet<>())
+            .add(permission);
+    }
+    
+    public void removePermission(UUID uuid, String permission) {
+        Set<String> perms = playerPermissions.get(uuid);
+        if (perms != null) {
+            perms.remove(permission);
+        }
+    }
+    
+    private boolean hasWildcard(Player player, String permission) {
+        // Check for wildcard permissions
+        // myplugin.* matches myplugin.anything
+        String[] parts = permission.split("\\.");
+        for (int i = parts.length - 1; i > 0; i--) {
+            String wildcard = String.join(".", Arrays.copyOf(parts, i)) + ".*";
+            if (hasPermission(player, wildcard)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+```
+
+## Permission UI/GUI
+
+### Admin Panel
+
+```java
+// Conceptual - create permission management GUI
+public class PermissionGUI {
+    
+    public void openPermissionManager(Player admin, Player target) {
+        // Show GUI with permission checkboxes
+        // Click to add/remove permissions
+    }
+}
+```
+
+## Community Expectations
+
+### LuckPerms Equivalent
+
+The community expects a LuckPerms-like plugin:
+
+**Features:**
+- Web GUI
+- Group management
+- Temporary permissions
+- Permission inheritance
+- Context-based permissions (world-specific, etc.)
+- Verbose mode (debug permissions)
+
+### Integration Points
+
+**Where permissions are needed:**
+- Commands
+- Features
+- Admin tools
+- Economy systems
+- World protection
+- Chat formatting
+
+## Best Practices
+
+### 1. Descriptive Permission Nodes
+
+```java
+// ✓ Good
+myplugin.teleport.spawn
+myplugin.teleport.player
+myplugin.admin.reload
+
+// ✗ Bad
+myplugin.tp
+myplugin.cmd1
+myplugin.admin
+```
+
+### 2. Check Permissions Early
+
+```java
+@Override
+public void execute(CommandSender sender, String[] args) {
+    // Check permission FIRST
+    if (!sender.hasPermission("myplugin.command")) {
+        sender.sendMessage("No permission");
+        return;
+    }
+    
+    // Then do expensive operations
+    performHeavyOperation();
+}
+```
+
+### 3. Provide Default Config
+
+```yaml
+# Default permissions for each group
+groups:
+  default:
+    - myplugin.use
+    - myplugin.help
+  vip:
+    - myplugin.fly
+    - myplugin.colors
+  admin:
+    - myplugin.*
+```
+
+### 4. Document Permissions
+
+```java
+/**
+ * Permissions:
+ * - myplugin.fly - Allow flying
+ * - myplugin.fly.speed - Change fly speed
+ * - myplugin.fly.others - Toggle fly for other players
+ */
+public class FlyCommand extends CommandBase {
+    // Command implementation
+}
+```
+
+### 5. Use Hierarchical Structure
+
+```
+myplugin.teleport.*
+  ├─ myplugin.teleport.spawn
+  ├─ myplugin.teleport.player
+  ├─ myplugin.teleport.world
+  └─ myplugin.teleport.coords
+```
+
+## Permission Commands Example
+
+```java
+public class PermissionCommand extends CommandBase {
+    
+    @Override
+    public String getName() {
+        return "perm";
+    }
+    
+    @Override
+    public void execute(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("myplugin.admin.permission")) {
+            sender.sendMessage("No permission");
+            return;
+        }
+        
+        if (args.length < 3) {
+            sender.sendMessage("Usage: /perm <add|remove|check> <player> <permission>");
+            return;
+        }
+        
+        String action = args[0];
+        Player target = getPlayer(args[1]);
+        String permission = args[2];
+        
+        if (target == null) {
+            sender.sendMessage("Player not found");
+            return;
+        }
+        
+        switch (action.toLowerCase()) {
+            case "add":
+                addPermission(target, permission);
+                sender.sendMessage("Added permission: " + permission);
+                break;
+            case "remove":
+                removePermission(target, permission);
+                sender.sendMessage("Removed permission: " + permission);
+                break;
+            case "check":
+                boolean has = target.hasPermission(permission);
+                sender.sendMessage("Has permission: " + has);
+                break;
+        }
+    }
+}
+```
+
+## Next Steps
+
+- [Plugin Lifecycle](/plugin-development/lifecycle) - Setup and shutdown
+- [Configuration](/plugin-development/configuration) - Store permissions
+- [Complete Examples](/plugin-development/examples) - Full implementations

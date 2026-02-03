@@ -1,0 +1,432 @@
+# Programming Languages
+
+Comprehensive guide to programming languages for Hytale development based on community discussions and official information.
+
+## Overview
+
+Hytale's technology stack includes multiple languages for different purposes:
+- **Server**: Java
+- **Client**: C# (Unity engine)
+- **Scripting**: JavaScript/TypeScript (mentioned in 2018 trailer)
+
+## Modding Languages & Scope (FAQ)
+
+**Q: What language should I use for server mods/plugins?**  
+A: Java is the only language consistently referenced for server-side plugins. Other JVM languages (Kotlin/Scala) are likely to work but are community-supported.
+
+**Q: Is client-side scripting confirmed?**  
+A: Not officially. JavaScript/TypeScript scripting was shown in the 2018 trailer, but current support details and scope are unconfirmed.
+
+**Q: Can I write client mods in C#?**  
+A: No official client modding API for C# has been announced. Treat any client-side language assumptions as speculative until official docs confirm them.
+
+**Q: Is this information official?**  
+A: Some of it is community-sourced and based on past trailers or Discord discussion. Treat uncertain points as provisional until official documentation is published.
+
+## Java (Server-Side)
+
+### Official Status
+- **Primary Language**: Java for server-side plugins
+- **Official Support**: Yes
+- **Minimum Version**: Java 17+
+- **Recommended**: Eclipse Temurin 25
+
+### Why Java?
+
+From Discord discussions:
+> "Java chosen for accessibility and Minecraft community familiarity" - Community insight
+
+Benefits:
+- Large existing developer community (Minecraft)
+- Extensive libraries and frameworks
+- Strong tooling (IntelliJ IDEA, Eclipse, VS Code)
+- Cross-platform compatibility
+
+### Getting Started with Java
+
+```java
+// Basic plugin structure
+import com.hytale.api.plugin.JavaPlugin;
+
+public class MyPlugin extends JavaPlugin {
+    @Override
+    protected void setup() {
+        getLogger().atInfo().log("Setting up plugin...");
+    }
+
+    @Override
+    protected void start() {
+        getLogger().atInfo().log("Plugin started!");
+    }
+
+    @Override
+    protected void shutdown() {
+        getLogger().atInfo().log("Plugin shutting down...");
+    }
+}
+```
+
+### Java Resources
+- [Official Java Tutorials](https://docs.oracle.com/javase/tutorial/)
+- [Java for Minecraft modders](https://www.youtube.com/playlist?list=PLMgDVIa0Pg8UsE-FgLW9ctkiCDe9JOAjq)
+- [Getting Started](/getting-started/java-setup)
+
+## Kotlin (Community Supported)
+
+### Status
+- **Official Support**: Not officially announced
+- **Community Consensus**: Will work from day one
+- **Compatibility**: Full (compiles to JVM bytecode)
+
+### Why Kotlin?
+
+From Discord:
+> "Kotlin is fully compatible since it compiles to JVM bytecode" - Technical discussion
+
+> "Kotlin overtook a lot of the modding community in Minecraft" - Community observation
+
+Benefits:
+- Modern language features
+- Null safety
+- Concise syntax
+- 100% Java interop
+- Growing in modding community
+
+### Kotlin Example
+
+```kotlin
+import com.hytale.api.plugin.JavaPlugin
+
+class MyPlugin : JavaPlugin() {
+    override fun setup() {
+        logger.atInfo().log("Setting up plugin...")
+    }
+
+    override fun start() {
+        logger.atInfo().log("Plugin started!")
+    }
+
+    override fun shutdown() {
+        logger.atInfo().log("Plugin shutting down...")
+    }
+}
+
+// More concise than Java
+data class PlayerData(
+    val uuid: UUID,
+    val kills: Int = 0,
+    val deaths: Int = 0
+) {
+    val kdr: Double
+        get() = if (deaths == 0) kills.toDouble() else kills.toDouble() / deaths
+}
+```
+
+### Important Note
+
+You may need to shade the Kotlin standard library:
+
+```kotlin
+// build.gradle.kts
+plugins {
+    kotlin("jvm") version "1.9.22"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
+}
+
+tasks.shadowJar {
+    relocate("kotlin", "com.myplugin.shaded.kotlin")
+}
+```
+
+### Kotlin Resources
+- [Kotlin Documentation](https://kotlinlang.org/docs/home.html)
+- [Kotlin for Java Developers](https://kotlinlang.org/docs/java-to-kotlin-idioms.html)
+
+## C# (Client-Side)
+
+### Status
+- **Usage**: Client-side (Unity engine)
+- **Plugin Support**: No official C# plugin API announced
+- **Modding**: Assets and data-driven content only initially
+
+### Why Not C# for Plugins?
+
+From Discord:
+> "C# is used for the client-side, but server plugins are Java-based" - Community clarification
+
+> "No official C# plugin support announced" - Current status
+
+The client downloads assets from the server but doesn't execute code initially.
+
+### Future Possibility
+
+Client-side scripting may be added later:
+- Graph-based visual scripting mentioned
+- Not planned for launch
+- Would be for client modifications, not server logic
+
+## JavaScript/TypeScript (Scripting)
+
+### Status
+- **Evidence**: Shown in original 2018 trailer
+- **Official Documentation**: Not yet released
+- **Purpose**: Likely for scripting and custom content
+
+### Community Discussion
+
+From Discord:
+> "JS for scripting was displayed in the original trailer" - Historical reference
+
+> "JS support sounds sick especially for mini add-ons" - Community enthusiasm
+
+### Expected Use Cases
+- Custom mini-games
+- Interactive content
+- Simpler modifications
+- Data-driven behavior
+
+### If/When JavaScript is Supported
+
+```javascript
+// Hypothetical example
+function onPlayerJoin(player) {
+    player.sendMessage("Welcome!");
+}
+
+// Event registration
+events.on('player_join', onPlayerJoin);
+```
+
+## Other JVM Languages
+
+### Scala
+
+**Compatibility**: Should work (compiles to JVM bytecode)
+
+**Community Interest**: Minimal
+
+**Challenges**:
+- Smaller community
+- Steeper learning curve
+- Need to shade standard library
+
+### Groovy
+
+**Compatibility**: Should work (compiles to JVM bytecode)
+
+**Community Interest**: Limited
+
+**Use Case**: Dynamic scripting, DSL creation
+
+### Clojure
+
+**Compatibility**: Should work (compiles to JVM bytecode)
+
+**Community Interest**: Very limited
+
+**Use Case**: Functional programming approach
+
+## Language Comparison
+
+| Language | Official Support | Compatibility | Community Size | Learning Curve |
+|----------|-----------------|---------------|----------------|----------------|
+| Java | ✅ Yes | Native | Large | Medium |
+| Kotlin | ⚠️ Not official | Full | Growing | Medium |
+| C# | ❌ Client only | N/A | N/A | N/A |
+| JavaScript | ⚠️ Possible | Unknown | TBD | Easy |
+| Scala | ⚠️ Theoretical | Full | Tiny | Hard |
+| Groovy | ⚠️ Theoretical | Full | Tiny | Medium |
+
+## Choosing a Language
+
+### For Beginners
+**Recommendation**: Start with Java
+
+Reasons:
+- Official support guaranteed
+- Largest community
+- Most tutorials and examples
+- Easier to get help
+
+### For Experienced Developers
+**Recommendation**: Java or Kotlin
+
+**Choose Java if**:
+- You want guaranteed compatibility
+- You prefer established patterns
+- You want maximum community support
+
+**Choose Kotlin if**:
+- You want modern language features
+- You're comfortable with build configuration
+- You don't mind shading dependencies
+- You value concise code
+
+### For Minecraft Modders
+**Recommendation**: Your current language
+
+If you know:
+- Forge/Fabric (Java) → Use Java
+- Paper/Spigot (Java) → Use Java
+- Fabric + Kotlin → Use Kotlin
+
+Transfer your existing knowledge!
+
+## Language Features Comparison
+
+### Null Safety
+
+**Java**:
+```java
+String name = player.getName();
+if (name != null) {
+    System.out.println(name);
+}
+```
+
+**Kotlin**:
+```kotlin
+val name = player.getName()
+println(name) // Compiler enforces null check if needed
+```
+
+### Data Classes
+
+**Java**:
+```java
+public class PlayerData {
+    private final UUID uuid;
+    private final int kills;
+    private final int deaths;
+
+    // Constructor, getters, equals, hashCode, toString...
+    // 50+ lines of boilerplate
+}
+```
+
+**Kotlin**:
+```kotlin
+data class PlayerData(
+    val uuid: UUID,
+    val kills: Int,
+    val deaths: Int
+)
+// That's it! Auto-generates everything
+```
+
+### Lambdas
+
+**Java**:
+```java
+players.stream()
+    .filter(p -> p.getKills() > 10)
+    .forEach(p -> p.sendMessage("High kills!"));
+```
+
+**Kotlin**:
+```kotlin
+players
+    .filter { it.kills > 10 }
+    .forEach { it.sendMessage("High kills!") }
+```
+
+## Build Tool Support
+
+### Gradle
+
+**Java**:
+```groovy
+plugins {
+    id 'java'
+}
+
+dependencies {
+    compileOnly files('libs/hytale-server.jar')
+}
+```
+
+**Kotlin**:
+```kotlin
+plugins {
+    kotlin("jvm") version "1.9.22"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
+}
+
+dependencies {
+    compileOnly(files("libs/hytale-server.jar"))
+    implementation(kotlin("stdlib"))
+}
+```
+
+### Maven
+
+Both languages work well with Maven, but Kotlin requires additional configuration.
+
+## Community Wisdom
+
+> "If it supports Java, expect Kotlin/Scala support to pop up from the community" - Language discussion
+
+> "Kotlin overtook a lot of the modding community in Minecraft at least" - Community trend
+
+> "Don't use C# for server plugins - it won't work" - Common misconception
+
+> "Learn Java first, then switch to Kotlin if you want" - Learning advice
+
+> "JavaScript support would be amazing for quick scripts and mini-games" - Future hopes
+
+> "I've never met a developer who tried Kotlin from Java and wanted to go back" - Community sentiment
+
+> "Java and Kotlin both compile to the same JVM bytecode so if it supports Java it supports Kotlin" - Technical fact
+
+> "Simon said just days ago to learn Java/JSON" - Official recommendation (January 2026)
+
+## Migration Guides
+
+### From Minecraft (Java)
+Your Java knowledge transfers well, but Hytale's plugin architecture differs significantly from Spigot/Paper.
+
+**Key Differences**:
+- ECS architecture instead of pure OOP
+- 30 TPS instead of 20 TPS
+- Different event names and registration patterns
+- Lifecycle methods: `setup()`, `start()`, `shutdown()` instead of `onEnable()`/`onDisable()`
+- Modern Java features encouraged
+- Different API structure (not based on Bukkit)
+
+### From Minecraft (Kotlin)
+Almost identical workflow:
+1. Use Kotlin plugin for Gradle
+2. Shade Kotlin stdlib
+3. Write plugins as usual
+
+### From C# (Unity/Godot)
+**Server Development**: Learn Java (similar to C#)
+
+**Key Similarities**:
+- OOP concepts same
+- Syntax very similar
+- Many patterns translate directly
+
+## Future Language Support
+
+### Speculative
+
+The community expects:
+- **Kotlin**: Day-one community support
+- **JavaScript**: Official support eventually
+- **Visual Scripting**: For non-programmers
+- **Other JVM languages**: Community-driven
+
+### Not Expected
+
+- C# for server plugins
+- Python (doesn't run on JVM)
+- Lua (not mentioned anywhere)
+- C++ (wrong platform)
+
+## Next Steps
+
+- [Getting Started](/getting-started) - Set up your environment
+- [Java Installation](/getting-started/java-setup) - Install Java
+- [First Plugin](/getting-started/first-plugin) - Create your first plugin
+- [Plugin Development](/plugin-development) - Develop with your chosen language

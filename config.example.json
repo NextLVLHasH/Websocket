@@ -1,0 +1,48 @@
+{
+  "enableDiscordBot": true,
+  "discordBotToken": "YOUR_BOT_TOKEN_HERE",
+  "notificationChannelId": "1234567890123456789",
+  "chatBridgeChannelId": "1234567890123456789",
+  "linkedRoleId": "1234567890123456789",
+  
+  "enableReactionRoles": true,
+  "reactionRoleChannelId": "1234567890123456789",
+  "reactionRoleMessageTitle": "Get your in-game roles below!",
+  "reactionRoleMessageDescription": "Click the reactions to get roles that will display in-game",
+  "reactionRoles": [
+    {
+      "emojiId": "⚔️",
+      "discordRoleId": "1234567890123456789",
+      "roleName": "Knight",
+      "inGamePrefix": "[Knight]"
+    },
+    {
+      "emojiId": "🏹",
+      "discordRoleId": "9876543210987654321",
+      "roleName": "Archer",
+      "inGamePrefix": "[Archer]"
+    },
+    {
+      "emojiId": "🔮",
+      "discordRoleId": "1111222233334444555",
+      "roleName": "Mage",
+      "inGamePrefix": "[Mage]"
+    }
+  ],
+  
+  "showDiscordNameInGame": true,
+  "showRolePrefixInGame": true,
+  
+  "enableChatBridge": true,
+  "syncHytaleToDiscord": true,
+  "syncDiscordToHytale": true,
+  
+  "enablePlayerJoinNotifications": true,
+  "enablePlayerLeaveNotifications": true,
+  
+  "serverName": "My Hytale Server",
+  "serverAddress": "play.myserver.com:5520",
+  "serverDescription": "A friendly Hytale server",
+  
+  "WSServerURL": "ws://localhost:8080"
+}

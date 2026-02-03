@@ -1,0 +1,640 @@
+# ECS Architecture
+
+Hytale uses a custom Entity Component System (ECS) architecture for managing game objects. Understanding ECS is crucial for advanced plugin development.
+
+## What is ECS?
+
+ECS is a design pattern that separates:
+- **Entities** - Unique identifiers (IDs) that serve as containers
+- **Components** - Data holders attached to entities
+- **Systems** - Logic that operates on entities with specific components
+
+> "It is our own. Custom for Hytale but meant to be less complex than other highly optimized ECS solutions." - Silkey (Tech Director)
+
+**Important:** The Java/Legacy server uses a custom ECS implementation developed by Hytale. This is different from FLECS, which was only used in the C++ engine rewrite that was eventually abandoned.
+
+> "Silkey was here a few days ago and I asked him about it, he said the java version had their own custom ECS system they developed (so not flecs like they used in the new engine)" - Discord community
+
+## Legacy Engine vs Cross-Platform Engine (Note)
+
+Community discussions indicate the team returned to the legacy (Java) engine for Early Access, while the cross-platform C++ engine work was paused. If the engine direction changes in the future, mod/plugin compatibility may shift, so treat any long-term assumptions as provisional until official updates confirm a roadmap.
+
+## Why ECS?
+
+### Benefits
+
+**Performance:**
+- Cache-friendly memory layout
+- Designed for parallel data access queries
+- Scales to thousands of entities efficiently
+- "10 of thousands on a single thread, hundreds of thousands if parallel" - Community member
+
+**Flexibility:**
+- Easy to add/remove behaviors
+- No rigid inheritance hierarchies
+- Runtime component composition
+- Thread-safe operations
+
+**Maintainability:**
+- Clear separation of data and logic
+- Systems are independent and testable
+- Components are simple data structures
+
+### Traditional OOP vs ECS
+
+**Traditional OOP:**
+```java
+class Player extends Entity {
+    Vector3 position;
+    int health;
+    Inventory inventory;
+
+    void move() { /* logic */ }
+    void takeDamage() { /* logic */ }
+}
+```
+
+**ECS Approach:**
+```java
+// Entity is just an ID
+Entity player = createEntity();
+
+// Add components (data)
+addComponent(player, PositionComponent);
+addComponent(player, HealthComponent);
+addComponent(player, InventoryComponent);
+
+// Systems handle logic
+MovementSystem.update();  // Operates on entities with PositionComponent
+DamageSystem.update();    // Operates on entities with HealthComponent
+```
+
+## Core ECS Concepts
+
+### 1. Entities
+
+Entities are simple identifiers - they don't contain data or logic:
+
+```java
+// Get entity reference
+Ref<EntityStore> entityRef = event.getPlayerRef();
+
+// Entities have IDs
+// They are containers for components
+```
+
+**Entity Examples:**
+- Players
+- Mobs
+- Items
+- Chests (containers)
+- Projectiles
+- Blocks (in some cases)
+
+### 2. Components
+
+Components are pure data structures. From the decompiled code, components implement the `Component<ECS_TYPE>` interface with clone methods for serialization.
+
+**Built-in Components (from decompiled code):**
+- `Player` - Player-specific data
+- `PlayerRef` - Player reference
+- `Transform` / `ModelTransform` - Position, rotation, scale (52 bytes)
+- `UUIDComponent` - UUID identity
+- `EffectControllerComponent` - Active effects
+- `MovementStatesComponent` - Movement state machine
+- `KnockbackComponent` - Physics/knockback
+- `DamageDataComponent` - Damage tracking
+- `ProjectileComponent` - Projectile properties
+- `UniqueItemUsagesComponent` - Item tracking
+- `Container` - Inventory/storage
+
+**ComponentUpdateType enum (25 types):**
+- Nameplate, UIComponents, CombatText
+- Model, PlayerSkin, Item, Block
+- Equipment, EntityStats, Transform
+- MovementStates, EntityEffects, Interactions
+- DynamicLight, Interactable, Intangible
+- Invulnerable, RespondToHit, HitboxCollision
+- Repulsion, Prediction, Audio, Mounted
+- NewSpawn, ActiveAnimations
+
+**Custom Components:**
+> "You can register a new component on those container entities" - Silkey
+
+### 3. Systems
+
+Systems contain logic and operate on entities with specific components:
+
+```java
+public class MySystem extends EntityEventSystem<EntityStore, MyEvent> {
+    // System logic here
+}
+```
+
+## Working with ECS
+
+### Thread Safety: world.execute()
+
+**Critical**: Component operations must run on the correct world thread. If you're accessing components from async events, commands, or other contexts, use `world.execute()`:
+
+```java
+// WRONG - Accessing components from wrong thread causes crash
+getEventRegistry().registerAsync(SomeEvent.class, event -> {
+    Player player = store.getComponent(ref, Player.getComponentType()); // CRASH!
+});
+
+// CORRECT - Schedule on world thread
+getEventRegistry().registerAsync(SomeEvent.class, event -> {
+    Player player = event.getPlayer();
+    World world = player.getWorld();
+
+    world.execute(() -> {
+        // Safe to access components here
+        Ref<EntityStore> ref = player.getRef();
+        Store<EntityStore> store = ref.getStore();
+        CustomComponent comp = store.getComponent(ref, CustomComponent.getComponentType());
+    });
+});
+```
+
+**When you need `world.execute()`:**
+- Async event handlers
+- Commands using `CommandBase` (use `AbstractPlayerCommand` instead)
+- Scheduled tasks
+- CompletableFuture callbacks
+- Any code not already on the world thread
+
+**When you don't need it:**
+- `EntityEventSystem.handle()` - Already on world thread
+- `AbstractPlayerCommand.execute()` - Already handled
+- Sync event handlers - Already on world thread
+
+See [Thread Safety Guide](/plugin-development/thread-safety) for detailed patterns.
+
+### Getting Components from Entities
+
+```java
+// Get entity reference from event
+Ref<EntityStore> entityRef = event.getPlayerRef();
+
+// Get the store
+Store<EntityStore> store = entityRef.getStore();
+
+// Get component from entity
+Player player = store.getComponent(entityRef, Player.getComponentType());
+
+// Check if component exists
+boolean hasComponent = store.hasComponent(entityRef, Player.getComponentType());
+```
+
+### Complete Example: Block Break System
+
+```java
+public class BlockBreakSystem extends EntityEventSystem<EntityStore, BreakBlockEvent> {
+
+    public BlockBreakSystem() {
+        super(BreakBlockEvent.class);
+    }
+
+    @Override
+    public void handle(int i,
+                       @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
+                       @Nonnull Store<EntityStore> store,
+                       @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                       @Nonnull BreakBlockEvent event) {
+
+        // Skip empty blocks
+        if (event.getBlockType() == BlockType.EMPTY) return;
+
+        // Get entity reference from the chunk
+        Ref<EntityStore> ref = archetypeChunk.getReferenceTo(i);
+
+        // Get Player component
+        Player player = store.getComponent(ref, Player.getComponentType());
+
+        if (player == null) return;
+
+        // Access player data through component
+        String blockId = event.getBlockType().getId();
+        player.sendMessage(Message.raw("You broke: " + blockId));
+    }
+
+    @Nullable
+    @Override
+    public Query<EntityStore> getQuery() {
+        // Query entities that have PlayerRef component
+        return PlayerRef.getComponentType();
+    }
+}
+
+// Register the system
+@Override
+protected void setup() {
+    getEntityStoreRegistry().registerSystem(new BlockBreakSystem());
+}
+```
+
+## ArchetypeChunk
+
+Chunks in ECS are groups of entities with the same component combination:
+
+```java
+ArchetypeChunk<EntityStore> chunk = ...;
+
+// Get specific entity from chunk by index
+Ref<EntityStore> ref = chunk.getReferenceTo(index);
+
+// Process all entities in chunk
+for (int i = 0; i < chunk.size(); i++) {
+    Ref<EntityStore> entityRef = chunk.getReferenceTo(i);
+    // Process entity
+}
+```
+
+## Store (Component Storage)
+
+The Store is the main ECS database that holds all components for all entities. From the decompiled code:
+
+**Store Features:**
+- Manages entities (refs, archetypes, components)
+- Supports parallel processing via `ParallelTask`
+- Resource storage for singleton resources
+- Command buffer for batched operations
+- Metric collection per system
+- Entity count limit: up to 4,096,000 entities per `EntityUpdates` packet
+
+```java
+Store<EntityStore> store = entityRef.getStore();
+
+// Get component
+Player player = store.getComponent(entityRef, Player.getComponentType());
+
+// Check if has component
+boolean hasHealth = store.hasComponent(entityRef, Health.getComponentType());
+
+// Set/Update component (advanced)
+store.setComponent(entityRef, newComponent);
+
+// Remove component (advanced)
+store.removeComponent(entityRef, componentType);
+```
+
+## Query System
+
+Queries let you find entities with specific components:
+
+```java
+@Override
+public Query<EntityStore> getQuery() {
+    // Find entities with Player component
+    return PlayerRef.getComponentType();
+}
+
+// More complex queries (conceptual)
+Query query = Query.builder()
+    .require(Player.getComponentType())
+    .require(Health.getComponentType())
+    .exclude(Dead.getComponentType())
+    .build();
+```
+
+## CommandBuffer
+
+CommandBuffer allows you to queue entity modifications:
+
+```java
+@Override
+public void handle(int i,
+                   ArchetypeChunk<EntityStore> chunk,
+                   Store<EntityStore> store,
+                   CommandBuffer<EntityStore> commandBuffer,
+                   MyEvent event) {
+
+    Ref<EntityStore> ref = chunk.getReferenceTo(i);
+
+    // Queue entity modifications
+    // commandBuffer.addComponent(ref, newComponent);
+    // commandBuffer.removeComponent(ref, componentType);
+    // commandBuffer.destroyEntity(ref);
+}
+```
+
+## Container Entities
+
+Chests and other containers are entities with components:
+
+> "Each item container is associated to an 'entity' in our ECS and they have entity ids... You can register a new component on those container entities" - Slikey
+
+```java
+// Conceptual example
+Entity chestEntity = getChestEntity(location);
+store.setComponent(chestEntity, CustomChestComponent);
+```
+
+## Custom Components (Advanced)
+
+While not fully documented, you can register custom components:
+
+```java
+// Conceptual - syntax may vary
+public class CustomComponent {
+    private String data;
+    private int value;
+
+    // Getters and setters
+}
+
+// Register on entity
+store.setComponent(entityRef, new CustomComponent());
+
+// Retrieve later
+CustomComponent custom = store.getComponent(
+    entityRef,
+    CustomComponent.getComponentType()
+);
+```
+
+## ECS Performance
+
+### Parallel Processing
+
+ECS is designed for multi-threading:
+
+```java
+// Systems can process entities in parallel
+// Cache-friendly data layout
+// Lock-free in many cases
+```
+
+**Threading Note:**
+> "When a chunk is being ticked, all other chunks within a certain radius are locked" - Region-locking approach
+
+### Memory Efficiency
+
+**Advantages:**
+- Components stored contiguously in memory
+- Better cache locality
+- Reduced memory fragmentation
+- "27kb per chunk" - Extremely efficient
+
+### Scale
+
+**Capacity:**
+- Thousands of entities on single thread
+- Hundreds of thousands with parallelization
+- Early versions had issues with "3000 entities causing lag"
+- Modern ECS implementations handle millions
+
+## ECS Challenges
+
+### Learning Curve
+
+> "god awful ECS/store/components system" - Some developers find it complex
+
+**Common Difficulties:**
+- Different from traditional OOP thinking
+- Not obvious how to get player from events
+- Requires understanding of component composition
+- Query system can be confusing
+
+### Event Integration
+
+ECS events require special handling:
+
+```java
+// ❌ WRONG - Won't work
+getEventRegistry().register(BreakBlockEvent.class, event -> {
+    // Can't get player directly from event
+});
+
+// ✅ CORRECT - Use EntityEventSystem
+public class System extends EntityEventSystem<EntityStore, BreakBlockEvent> {
+    // Properly integrated with ECS
+}
+```
+
+## ECS Best Practices
+
+### 1. Keep Components Simple
+
+```java
+// ✓ Good - Pure data
+public class HealthComponent {
+    private int currentHealth;
+    private int maxHealth;
+    // Getters and setters only
+}
+
+// ✗ Bad - Logic in component
+public class HealthComponent {
+    private int health;
+
+    public void takeDamage(int amount) {
+        // Logic belongs in system, not component
+    }
+}
+```
+
+### 2. Put Logic in Systems
+
+```java
+// System handles all health logic
+public class HealthSystem extends EntitySystem<EntityStore> {
+
+    public void applyDamage(Ref<EntityStore> entity, int damage) {
+        HealthComponent health = store.getComponent(entity, HealthComponent.class);
+        health.setCurrentHealth(health.getCurrentHealth() - damage);
+        store.setComponent(entity, health);
+    }
+}
+```
+
+### 3. Use Queries Effectively
+
+```java
+@Override
+public Query<EntityStore> getQuery() {
+    // Only process relevant entities
+    return PlayerRef.getComponentType();
+}
+```
+
+### 4. Check Component Existence
+
+```java
+// Always verify component exists
+Player player = store.getComponent(ref, Player.getComponentType());
+if (player == null) {
+    return; // Entity doesn't have Player component
+}
+```
+
+### 5. Use CommandBuffer for Modifications
+
+```java
+// Queue modifications, don't modify directly during iteration
+commandBuffer.addComponent(ref, component);
+commandBuffer.removeComponent(ref, componentType);
+```
+
+## Common Patterns
+
+### Component Access Pattern
+
+```java
+private Player getPlayer(Ref<EntityStore> ref, Store<EntityStore> store) {
+    return store.getComponent(ref, Player.getComponentType());
+}
+
+private boolean hasPlayer(Ref<EntityStore> ref, Store<EntityStore> store) {
+    return store.hasComponent(ref, Player.getComponentType());
+}
+```
+
+### Safe Component Update
+
+```java
+Ref<EntityStore> ref = chunk.getReferenceTo(i);
+Player player = store.getComponent(ref, Player.getComponentType());
+
+if (player != null) {
+    // Safe to use player
+    player.sendMessage(Message.raw("Hello!"));
+}
+```
+
+### Multi-Component Access
+
+```java
+Player player = store.getComponent(ref, Player.getComponentType());
+Health health = store.getComponent(ref, Health.getComponentType());
+Transform transform = store.getComponent(ref, Transform.getComponentType());
+
+if (player != null && health != null && transform != null) {
+    // Entity has all required components
+}
+```
+
+## ECS vs Traditional OOP
+
+### Traditional OOP (Event-Driven)
+
+```java
+Player player = event.getPlayer();
+player.setHealth(20);
+player.teleport(location);
+```
+
+### Hytale ECS
+
+```java
+Ref<EntityStore> ref = archetypeChunk.getReferenceTo(i);
+Store<EntityStore> store = ref.getStore();
+Player player = store.getComponent(ref, Player.getComponentType());
+
+if (player != null) {
+    // Access player through component
+}
+```
+
+## Module Dependencies
+
+Some systems require specific modules:
+
+**manifest.json:**
+```json
+{
+  "dependencies": [
+    "Hytale:DamageModule"
+  ]
+}
+```
+
+Required for death/damage systems.
+
+## Debugging ECS
+
+### Common Issues
+
+```java
+// Issue: Getting null player
+Player player = store.getComponent(ref, Player.getComponentType());
+// Solution: Always check for null
+
+// Issue: Event not firing
+// Solution: Make sure you're using EntityEventSystem
+
+// Issue: Can't modify during iteration
+// Solution: Use CommandBuffer
+```
+
+### Logging
+
+```java
+@Override
+public void handle(...) {
+    getLogger().atInfo().log("System triggered");
+    getLogger().atInfo().log("Entity count: " + chunk.size());
+
+    Ref<EntityStore> ref = chunk.getReferenceTo(i);
+    Player player = store.getComponent(ref, Player.getComponentType());
+
+    if (player != null) {
+        getLogger().atInfo().log("Player: " + player.getName());
+    }
+}
+```
+
+## Performance Tips
+
+### 1. Minimize Component Lookups
+
+```java
+// ✗ Bad - Multiple lookups
+if (store.hasComponent(ref, Player.getComponentType())) {
+    Player player = store.getComponent(ref, Player.getComponentType());
+    // Use player
+}
+
+// ✓ Good - Single lookup
+Player player = store.getComponent(ref, Player.getComponentType());
+if (player != null) {
+    // Use player
+}
+```
+
+### 2. Batch Operations
+
+```java
+// Process multiple entities at once
+for (int i = 0; i < chunk.size(); i++) {
+    Ref<EntityStore> ref = chunk.getReferenceTo(i);
+    // Process entity
+}
+```
+
+### 3. Use Appropriate Queries
+
+```java
+// Only query what you need
+@Override
+public Query<EntityStore> getQuery() {
+    return PlayerRef.getComponentType(); // Not all entities
+}
+```
+
+## Community Insights
+
+> "ECS is designed for parallel data access queries" - Performance benefits
+
+> "Cannot get player directly from BreakBlockEvent - must use system pattern" - Common confusion
+
+> "Each world runs on its own thread" - Multi-world performance
+
+> "3000 entities caused lag in early versions" - ECS not fully optimized initially
+
+## Next Steps
+
+- [Event System](/plugin-development/event-system) - Working with ECS events
+- [Player Data](/plugin-development/player-data) - Accessing player components
+- [Complete Examples](/plugin-development/examples) - Full ECS implementations

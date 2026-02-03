@@ -1,0 +1,291 @@
+# Player Teleportation
+
+Teleporting players in Hytale requires using the correct API to avoid client/server desync issues. This guide covers the proper approach.
+
+## The Problem
+
+A common mistake is trying to teleport players by directly modifying the `TransformComponent`:
+
+```java
+// WRONG - Causes client/server desync!
+TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+transform.setPosition(new Vector3f(100, 64, 100));
+```
+
+This approach causes the server to think the player moved, but the client doesn't update visually. The player appears stuck in their original position.
+
+> "I tried updating the TransformComponent via setPosition(), but it causes a desync (the server thinks I moved, but the client doesn't update)." - From Discord
+
+## Correct Approach: Using the Teleport Component
+
+The proper way to teleport players is by adding a `Teleport` component to the entity:
+
+```java
+public void teleportPlayer(Ref<EntityStore> ref, Store<EntityStore> store, Vector3f targetPosition) {
+    // Get current transform for rotation
+    TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+
+    if (transform != null) {
+        // Create teleport component
+        Teleport teleport = new Teleport(
+            targetPosition,           // Target position
+            transform.getRotation()   // Preserve current rotation
+        );
+
+        // Add teleport component - this triggers proper client sync
+        store.addComponent(ref, Teleport.getComponentType(), teleport);
+    }
+}
+```
+
+## Complete Example: SetSpawn Command
+
+Here's a complete example of a spawn system with set and go commands:
+
+```java
+public class SpawnPlugin extends JavaPlugin {
+    private Vector3f spawnLocation;
+
+    @Override
+    protected void setup() {
+        getCommandRegistry().registerCommand(new SetSpawnCommand());
+        getCommandRegistry().registerCommand(new SpawnCommand());
+    }
+
+    // Command to set spawn location
+    public class SetSpawnCommand extends AbstractPlayerCommand {
+        public SetSpawnCommand() {
+            super("setspawn", "spawn.commands.setspawn");
+        }
+
+        @Override
+        protected void execute(Ref<EntityStore> ref, Store<EntityStore> store, CommandContext context) {
+            TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+
+            if (transform != null) {
+                spawnLocation = transform.getPosition();
+                Player player = store.getComponent(ref, Player.getComponentType());
+                if (player != null) {
+                    player.sendMessage(Message.raw("Spawn set at: " +
+                        spawnLocation.x + ", " +
+                        spawnLocation.y + ", " +
+                        spawnLocation.z));
+                }
+            }
+        }
+    }
+
+    // Command to teleport to spawn
+    public class SpawnCommand extends AbstractPlayerCommand {
+        public SpawnCommand() {
+            super("spawn", "spawn.commands.spawn");
+        }
+
+        @Override
+        protected void execute(Ref<EntityStore> ref, Store<EntityStore> store, CommandContext context) {
+            if (spawnLocation == null) {
+                context.sendMessage(Message.raw("Spawn not set!"));
+                return;
+            }
+
+            TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+
+            if (transform != null) {
+                // Create and add teleport component
+                Teleport teleport = new Teleport(
+                    spawnLocation,
+                    transform.getRotation()
+                );
+                store.addComponent(ref, Teleport.getComponentType(), teleport);
+
+                Player player = store.getComponent(ref, Player.getComponentType());
+                if (player != null) {
+                    player.sendMessage(Message.raw("Teleported to spawn!"));
+                }
+            }
+        }
+    }
+}
+```
+
+## Teleporting with Rotation
+
+To teleport a player and change their facing direction:
+
+```java
+public void teleportWithRotation(Ref<EntityStore> ref, Store<EntityStore> store,
+                                  Vector3f position, Quaternionf rotation) {
+    Teleport teleport = new Teleport(position, rotation);
+    store.addComponent(ref, Teleport.getComponentType(), teleport);
+}
+
+// Example: Teleport facing north
+Quaternionf facingNorth = new Quaternionf(); // Default rotation faces north
+teleportWithRotation(ref, store, new Vector3f(0, 64, 0), facingNorth);
+```
+
+## Teleporting Between Worlds
+
+To teleport a player to a different world:
+
+```java
+public void teleportToWorld(Player player, World targetWorld, Vector3f position) {
+    // Get the player's entity ref
+    Ref<EntityStore> ref = player.getRef();
+    Store<EntityStore> store = ref.getStore();
+
+    // Get current rotation
+    TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+    Quaternionf rotation = transform != null ? transform.getRotation() : new Quaternionf();
+
+    // Use world transfer
+    // Note: This may require additional API depending on server version
+    targetWorld.execute(() -> {
+        // Transfer player to new world at position
+        Teleport teleport = new Teleport(position, rotation);
+        // Additional world transfer logic may be needed
+    });
+}
+```
+
+## Event-Based Teleportation
+
+Teleporting players in response to events:
+
+```java
+public class TeleportOnDeathSystem extends EntityEventSystem<EntityStore, PlayerDeathEvent> {
+
+    private final Vector3f respawnPoint;
+
+    public TeleportOnDeathSystem(Vector3f respawnPoint) {
+        super(PlayerDeathEvent.class);
+        this.respawnPoint = respawnPoint;
+    }
+
+    @Override
+    public void handle(int i,
+                       @Nonnull ArchetypeChunk<EntityStore> chunk,
+                       @Nonnull Store<EntityStore> store,
+                       @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                       @Nonnull PlayerDeathEvent event) {
+
+        Ref<EntityStore> ref = chunk.getReferenceTo(i);
+        TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+
+        if (transform != null) {
+            // Schedule teleport after respawn
+            Teleport teleport = new Teleport(respawnPoint, transform.getRotation());
+            commandBuffer.addComponent(ref, Teleport.getComponentType(), teleport);
+        }
+    }
+
+    @Nullable
+    @Override
+    public Query<EntityStore> getQuery() {
+        return PlayerRef.getComponentType();
+    }
+}
+```
+
+## Async Teleportation (with Database Lookup)
+
+When you need to load teleport data asynchronously:
+
+```java
+public void teleportToHome(Player player, World world) {
+    UUID playerId = player.getUUID();
+
+    CompletableFuture.runAsync(() -> {
+        // Async: Load home location from database
+        Vector3f homeLocation = database.getHomeLocation(playerId);
+
+        if (homeLocation != null) {
+            // Sync back to world thread
+            world.execute(() -> {
+                Ref<EntityStore> ref = player.getRef();
+                Store<EntityStore> store = ref.getStore();
+
+                TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+                if (transform != null) {
+                    Teleport teleport = new Teleport(homeLocation, transform.getRotation());
+                    store.addComponent(ref, Teleport.getComponentType(), teleport);
+                    player.sendMessage(Message.raw("Teleported home!"));
+                }
+            });
+        } else {
+            player.sendMessage(Message.raw("No home set!"));
+        }
+    });
+}
+```
+
+## Common Mistakes
+
+### Mistake 1: Direct Position Modification
+
+```java
+// WRONG - Causes desync
+transform.setPosition(newPosition);
+
+// CORRECT - Use Teleport component
+store.addComponent(ref, Teleport.getComponentType(), new Teleport(newPosition, rotation));
+```
+
+### Mistake 2: Wrong Thread
+
+```java
+// WRONG - Not on world thread
+getEventRegistry().registerAsync(SomeEvent.class, event -> {
+    // This will crash!
+    store.addComponent(ref, Teleport.getComponentType(), teleport);
+});
+
+// CORRECT - Schedule on world thread
+world.execute(() -> {
+    store.addComponent(ref, Teleport.getComponentType(), teleport);
+});
+```
+
+### Mistake 3: Null Transform Check
+
+```java
+// WRONG - Missing null check
+TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+Teleport teleport = new Teleport(position, transform.getRotation()); // NPE if transform is null!
+
+// CORRECT - Always check for null
+TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+if (transform != null) {
+    Teleport teleport = new Teleport(position, transform.getRotation());
+    store.addComponent(ref, Teleport.getComponentType(), teleport);
+}
+```
+
+## Teleport Limitations
+
+### Teleporter Count Limit
+
+There may be limits on teleporter entities. Check server configuration for `MaxTeleporterCount` or similar settings.
+
+### Cross-Server Teleportation
+
+For teleporting players between servers, use Transfer Packets instead. See [Multi-Server Architecture](/server-setup/multi-server).
+
+### Portal-Based Teleportation
+
+For portal mechanics, consider using the built-in portal system rather than raw teleportation. The `portals` builtin module handles this.
+
+## Summary
+
+| Approach | Use Case | Thread Safety |
+|----------|----------|---------------|
+| `Teleport` component | Standard teleportation | Must be on world thread |
+| `TransformComponent.setPosition()` | Don't use! | Causes desync |
+| Transfer packets | Cross-server teleport | Special handling |
+| Portal module | Portal mechanics | Built-in handling |
+
+## Next Steps
+
+- [Thread Safety](/plugin-development/thread-safety) - Understanding thread contexts
+- [ECS Architecture](/plugin-development/ecs-architecture) - Component system basics
+- [Multi-Server](/server-setup/multi-server) - Cross-server transfers

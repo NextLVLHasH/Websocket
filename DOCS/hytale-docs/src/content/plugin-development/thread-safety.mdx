@@ -1,0 +1,334 @@
+# Thread Safety & World Execution
+
+One of the most common errors when developing Hytale plugins is the `IllegalStateException: Assert not in thread!` error. This guide explains why it happens and how to fix it.
+
+## The Problem
+
+When you try to access entity components from the wrong thread, you'll see an error like:
+
+```
+java.lang.IllegalStateException: Assert not in thread!
+Thread[#108,WorldThread - default,5,InnocuousForkJoinWorkerThreadGroup]
+but was in Thread[#75,Scheduler,5,main]
+```
+
+This happens because Hytale's ECS (Entity Component System) requires component operations to run on the correct world thread for thread safety.
+
+## Common Scenarios
+
+### Commands Accessing Components
+
+```java
+// WRONG - This will throw "Assert not in thread!" error
+public class MyCommand extends CommandBase {
+    @Override
+    protected void executeSync(@Nonnull CommandContext context) {
+        Ref<EntityStore> playerRef = context.senderAsPlayerRef();
+        Store<EntityStore> store = playerRef.getStore();
+
+        // This line will crash!
+        CustomComponent component = store.getComponent(playerRef, CustomComponent.getComponentType());
+
+        context.sendMessage(Message.raw("Value: " + component.getValue()));
+    }
+}
+```
+
+### Async Events
+
+```java
+// WRONG - Async event handlers run on different threads
+getEventRegistry().registerAsync(PlayerChatEvent.class, event -> {
+    Ref<EntityStore> ref = event.getPlayerRef();
+    Store<EntityStore> store = ref.getStore();
+
+    // This will crash - wrong thread!
+    Player player = store.getComponent(ref, Player.getComponentType());
+});
+```
+
+## Solutions
+
+### Solution 1: Use `world.execute()`
+
+Schedule your component operations on the world thread:
+
+```java
+public class MyCommand extends CommandBase {
+    @Override
+    protected void executeSync(@Nonnull CommandContext context) {
+        if (!context.isPlayer()) {
+            context.sendMessage(Message.raw("Players only."));
+            return;
+        }
+
+        Player player = context.senderAs(Player.class);
+        World world = player.getWorld();
+
+        // Schedule on world thread
+        world.execute(() -> {
+            Ref<EntityStore> playerRef = context.senderAsPlayerRef();
+            Store<EntityStore> store = playerRef.getStore();
+
+            // Safe - running on world thread now
+            CustomComponent component = store.getComponent(playerRef, CustomComponent.getComponentType());
+
+            if (component != null) {
+                context.sendMessage(Message.raw("Value: " + component.getValue()));
+            }
+        });
+    }
+}
+```
+
+### Solution 2: Use `AbstractPlayerCommand`
+
+For commands that need component access, extend `AbstractPlayerCommand` instead of `CommandBase`:
+
+```java
+// CORRECT - AbstractPlayerCommand handles thread context automatically
+public class SafeComponentCommand extends AbstractPlayerCommand {
+
+    public SafeComponentCommand() {
+        super("mycommand", "myplugin.commands.mycommand.desc");
+    }
+
+    @Override
+    protected void execute(Ref<EntityStore> ref, Store<EntityStore> store, CommandContext context) {
+        // Safe - AbstractPlayerCommand ensures correct thread context
+        Player player = store.getComponent(ref, Player.getComponentType());
+
+        if (player != null) {
+            CustomComponent component = store.getComponent(ref, CustomComponent.getComponentType());
+            player.sendMessage(Message.raw("Your value: " + component.getValue()));
+        }
+    }
+}
+```
+
+**Key differences:**
+- `AbstractPlayerCommand` provides `Ref<EntityStore>` and `Store<EntityStore>` directly
+- The `execute()` method runs in the correct thread context
+- No need to manually call `world.execute()`
+
+### Solution 3: Use Entity Event Systems
+
+For event-based component access, use `EntityEventSystem`:
+
+```java
+// CORRECT - EntityEventSystem runs on the correct thread
+public class MyEventSystem extends EntityEventSystem<EntityStore, BreakBlockEvent> {
+
+    public MyEventSystem() {
+        super(BreakBlockEvent.class);
+    }
+
+    @Override
+    public void handle(int i,
+                       @Nonnull ArchetypeChunk<EntityStore> chunk,
+                       @Nonnull Store<EntityStore> store,
+                       @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                       @Nonnull BreakBlockEvent event) {
+
+        Ref<EntityStore> ref = chunk.getReferenceTo(i);
+
+        // Safe - EntityEventSystem handles thread context
+        Player player = store.getComponent(ref, Player.getComponentType());
+        CustomComponent custom = store.getComponent(ref, CustomComponent.getComponentType());
+
+        if (player != null && custom != null) {
+            player.sendMessage(Message.raw("Block broken! Custom value: " + custom.getValue()));
+        }
+    }
+
+    @Nullable
+    @Override
+    public Query<EntityStore> getQuery() {
+        return PlayerRef.getComponentType();
+    }
+}
+
+// Register in setup()
+@Override
+protected void setup() {
+    getEntityStoreRegistry().registerSystem(new MyEventSystem());
+}
+```
+
+## Quick Reference: Which Approach to Use
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| Command needs component access | `AbstractPlayerCommand` |
+| Command with complex logic | `world.execute()` wrapper |
+| Event handling with components | `EntityEventSystem` |
+| Async operations | `world.execute()` to sync back |
+| Console commands | `CommandBase` (no component access) |
+
+## Understanding Thread Context
+
+Hytale uses multiple threads:
+
+- **World Thread**: Each world runs on its own thread. Component operations must run here.
+- **Scheduler Thread**: Async tasks and some events run here.
+- **Network Thread**: Handles packet processing.
+
+```
+Main Thread
+    └── World Thread (default)
+    └── World Thread (nether)
+    └── Scheduler Thread
+    └── Network Thread
+```
+
+When you call `world.execute()`, you're scheduling work to run on that specific world's thread.
+
+## Common Patterns
+
+### Pattern: Safe Async Component Update
+
+```java
+// Reading data from database, then updating component
+public void loadPlayerData(Player player, World world) {
+    CompletableFuture.runAsync(() -> {
+        // Async: Load from database
+        PlayerData data = database.loadPlayerData(player.getUUID());
+
+        // Sync back to world thread
+        world.execute(() -> {
+            Ref<EntityStore> ref = player.getRef();
+            Store<EntityStore> store = ref.getStore();
+
+            // Safe to access components now
+            CustomComponent component = store.getComponent(ref, CustomComponent.getComponentType());
+            if (component != null) {
+                component.setData(data);
+            }
+        });
+    });
+}
+```
+
+### Pattern: Deferred Component Access in Events
+
+```java
+getEventRegistry().registerAsync(SomeAsyncEvent.class, event -> {
+    Player player = event.getPlayer();
+    World world = player.getWorld();
+
+    // Don't access components here - wrong thread!
+    // Instead, schedule for later:
+    world.execute(() -> {
+        Ref<EntityStore> ref = player.getRef();
+        Store<EntityStore> store = ref.getStore();
+
+        // Now safe
+        CustomComponent component = store.getComponent(ref, CustomComponent.getComponentType());
+    });
+});
+```
+
+### Pattern: Batch Component Operations
+
+```java
+world.execute(() -> {
+    // Group multiple component operations in one world.execute() call
+    for (Player player : getOnlinePlayers()) {
+        Ref<EntityStore> ref = player.getRef();
+        Store<EntityStore> store = ref.getStore();
+
+        CustomComponent component = store.getComponent(ref, CustomComponent.getComponentType());
+        if (component != null) {
+            component.incrementValue();
+        }
+    }
+});
+```
+
+## Debugging Thread Issues
+
+### Check Current Thread
+
+```java
+public void debugThreadContext() {
+    Thread current = Thread.currentThread();
+    getLogger().atInfo().log("Current thread: " + current.getName());
+    getLogger().atInfo().log("Thread ID: " + current.getId());
+}
+```
+
+### Verify World Thread
+
+```java
+world.execute(() -> {
+    getLogger().atInfo().log("Running on world thread: " + Thread.currentThread().getName());
+});
+```
+
+## Common Mistakes
+
+### Mistake 1: Nested world.execute()
+
+```java
+// Unnecessary nesting
+world.execute(() -> {
+    world.execute(() -> {  // Don't do this - already on world thread
+        // ...
+    });
+});
+```
+
+### Mistake 2: Blocking the World Thread
+
+```java
+// WRONG - Don't do heavy work on world thread
+world.execute(() -> {
+    // This blocks the world!
+    Thread.sleep(5000);
+    database.saveAllPlayers();  // Blocking I/O
+});
+
+// CORRECT - Do heavy work async, then sync result
+CompletableFuture.runAsync(() -> {
+    database.saveAllPlayers();
+}).thenRun(() -> {
+    world.execute(() -> {
+        // Quick update on world thread
+    });
+});
+```
+
+### Mistake 3: Ignoring Return Values
+
+```java
+// world.execute() returns immediately - the work is scheduled
+world.execute(() -> {
+    result = calculateSomething();
+});
+// result is NOT available here yet!
+
+// Use CompletableFuture if you need the result
+CompletableFuture<Integer> future = CompletableFuture.supplyAsync(() -> {
+    // Heavy calculation
+    return 42;
+});
+future.thenAccept(result -> {
+    world.execute(() -> {
+        // Use result on world thread
+    });
+});
+```
+
+## Summary
+
+1. **Thread errors** occur when accessing components from the wrong thread
+2. **Use `AbstractPlayerCommand`** for commands that need component access
+3. **Use `world.execute()`** to schedule operations on the world thread
+4. **Use `EntityEventSystem`** for event-based component access
+5. **Never block** the world thread with heavy operations
+
+## Next Steps
+
+- [ECS Architecture](/plugin-development/ecs-architecture) - Understanding the component system
+- [Commands](/plugin-development/commands) - Command patterns and best practices
+- [Event System](/plugin-development/event-system) - Event handling approaches

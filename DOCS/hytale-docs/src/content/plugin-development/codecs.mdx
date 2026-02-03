@@ -1,0 +1,405 @@
+# Codec System & Custom Interactions
+
+Hytale uses a codec system for serialization and deserialization of game data. Understanding codecs is essential for creating custom interactions, configurations, and data types.
+
+## What are Codecs?
+
+Codecs are bidirectional converters that transform Java objects to/from BSON (Binary JSON) or other formats. They're used throughout Hytale for:
+
+- Configuration files
+- Asset definitions
+- Custom interactions
+- Network serialization (with Zstd compression)
+- Data persistence
+
+**From Decompiled Code - Codec Architecture:**
+```
+Codec<T> - Generic serialization interface
+├─ PrimitiveCodec (built-in types)
+├─ KeyedCodec (named field codec)
+├─ BuilderCodec (fluent builder)
+├─ DirectDecodeCodec
+├─ RawJsonCodec/RawJsonInheritCodec
+├─ DocumentContainingCodec (BSON support)
+└─ Schema validation
+```
+
+**Technical Notes:**
+- Primary format is BSON (Binary JSON), not plain JSON
+- Network packets use Zstd compression
+- Config files typically use `.json` extension but are BSON-compatible
+- Supports schema-based validation
+
+## BuilderCodec Basics
+
+The most common codec type is `BuilderCodec`, which uses a builder pattern for complex objects.
+
+### Simple Example
+
+```java
+public class MyData {
+    private String name;
+    private int value;
+
+    public MyData() {}
+
+    public MyData(String name, int value) {
+        this.name = name;
+        this.value = value;
+    }
+
+    // Getters and setters
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public int getValue() { return value; }
+    public void setValue(int value) { this.value = value; }
+}
+
+// Create a codec for MyData
+BuilderCodec<MyData> codec = BuilderCodec.builder(MyData.class, MyData::new)
+    .with("name", Codec.STRING, MyData::getName, MyData::setName)
+    .with("value", Codec.INT, MyData::getValue, MyData::setValue)
+    .build();
+```
+
+### With Default Values
+
+```java
+BuilderCodec<MyData> codec = BuilderCodec.builder(MyData.class, MyData::new)
+    .with("name", Codec.STRING, MyData::getName, MyData::setName)
+    .withDefault("value", Codec.INT, MyData::getValue, MyData::setValue, 0)  // Default: 0
+    .withOptional("description", Codec.STRING, MyData::getDescription, MyData::setDescription)
+    .build();
+```
+
+## Registering Custom Interactions
+
+One of the most common uses of codecs is registering custom interactions. This is frequently asked about in Discord.
+
+### Step 1: Create Your Interaction Class
+
+```java
+public class EntityInteraction extends SimpleInteraction {
+
+    public EntityInteraction() {
+        super();
+    }
+
+    @Override
+    public void handle(Ref<EntityStore> ref, Store<EntityStore> store) {
+        Player player = Util.extractPlayer(ref);
+        if (player != null) {
+            player.sendMessage(Message.raw("You interacted with the entity!"));
+        }
+    }
+}
+```
+
+### Step 2: Create the Codec
+
+```java
+BuilderCodec<EntityInteraction> codec = BuilderCodec.builder(
+    EntityInteraction.class,
+    EntityInteraction::new
+).build();
+```
+
+### Step 3: Register in Setup
+
+```java
+@Override
+protected void setup() {
+    // Create the codec
+    final var codec = BuilderCodec.builder(EntityInteraction.class, EntityInteraction::new).build();
+
+    // Register with the interaction codec registry
+    getCodecRegistry(Interaction.CODEC).register(
+        "my-interaction",           // Unique identifier
+        EntityInteraction.class,    // Class type
+        codec                       // The codec
+    );
+}
+```
+
+### Complete Custom Interaction Example
+
+```java
+public class CustomInteractionPlugin extends JavaPlugin {
+
+    @Override
+    protected void setup() {
+        registerMyInteraction();
+    }
+
+    private void registerMyInteraction() {
+        // Define the codec
+        BuilderCodec<MyCustomInteraction> codec = BuilderCodec.builder(
+            MyCustomInteraction.class,
+            MyCustomInteraction::new
+        )
+        .with("message", Codec.STRING, MyCustomInteraction::getMessage, MyCustomInteraction::setMessage)
+        .withDefault("times", Codec.INT, MyCustomInteraction::getTimes, MyCustomInteraction::setTimes, 1)
+        .build();
+
+        // Register it
+        getCodecRegistry(Interaction.CODEC).register(
+            "custom-interaction",
+            MyCustomInteraction.class,
+            codec
+        );
+
+        getLogger().atInfo().log("Registered custom-interaction");
+    }
+
+    public static class MyCustomInteraction extends SimpleInteraction {
+        private String message = "Hello!";
+        private int times = 1;
+
+        public MyCustomInteraction() {
+            super();
+        }
+
+        @Override
+        public void handle(Ref<EntityStore> ref, Store<EntityStore> store) {
+            Player player = Util.extractPlayer(ref);
+            if (player != null) {
+                for (int i = 0; i < times; i++) {
+                    player.sendMessage(Message.raw(message));
+                }
+            }
+        }
+
+        // Getters and setters
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+        public int getTimes() { return times; }
+        public void setTimes(int times) { this.times = times; }
+    }
+}
+```
+
+## Codec Types
+
+Hytale provides several codec map types for different registration contexts:
+
+| Codec Type | Use Case |
+|------------|----------|
+| `StringCodecMapCodec` | String-keyed registries |
+| `MapKeyMapCodec` | Map-based key registries |
+| `AssetCodecMapCodec` | Asset-related registries |
+
+### Getting the Right Registry
+
+```java
+// For interactions
+getCodecRegistry(Interaction.CODEC)
+
+// The registry type is inferred from the codec constant
+// Common codec constants:
+// - Interaction.CODEC
+// - BlockType.CODEC
+// - ItemType.CODEC
+```
+
+## Plugin Configuration with Codecs
+
+Use codecs for type-safe plugin configuration:
+
+### Define Config Class
+
+```java
+public class MyPluginConfig {
+    private boolean enabled = true;
+    private int maxPlayers = 100;
+    private String welcomeMessage = "Welcome!";
+    private List<String> allowedWorlds = new ArrayList<>();
+
+    // Default constructor required
+    public MyPluginConfig() {}
+
+    // Getters and setters...
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public int getMaxPlayers() { return maxPlayers; }
+    public void setMaxPlayers(int maxPlayers) { this.maxPlayers = maxPlayers; }
+    public String getWelcomeMessage() { return welcomeMessage; }
+    public void setWelcomeMessage(String welcomeMessage) { this.welcomeMessage = welcomeMessage; }
+    public List<String> getAllowedWorlds() { return allowedWorlds; }
+    public void setAllowedWorlds(List<String> allowedWorlds) { this.allowedWorlds = allowedWorlds; }
+}
+```
+
+### Create Config Codec
+
+```java
+BuilderCodec<MyPluginConfig> configCodec = BuilderCodec.builder(
+    MyPluginConfig.class,
+    MyPluginConfig::new
+)
+.withDefault("enabled", Codec.BOOLEAN, MyPluginConfig::isEnabled, MyPluginConfig::setEnabled, true)
+.withDefault("maxPlayers", Codec.INT, MyPluginConfig::getMaxPlayers, MyPluginConfig::setMaxPlayers, 100)
+.withDefault("welcomeMessage", Codec.STRING, MyPluginConfig::getWelcomeMessage, MyPluginConfig::setWelcomeMessage, "Welcome!")
+.withDefault("allowedWorlds", Codec.STRING.listOf(), MyPluginConfig::getAllowedWorlds, MyPluginConfig::setAllowedWorlds, List.of())
+.build();
+```
+
+### Use with Plugin Config System
+
+```java
+public class MyPlugin extends JavaPlugin {
+    private Config<MyPluginConfig> config;
+
+    @Override
+    protected void setup() {
+        BuilderCodec<MyPluginConfig> codec = /* ... */;
+        config = withConfig("config", codec);
+    }
+
+    @Override
+    protected void start() {
+        config.load().thenAccept(cfg -> {
+            if (cfg.isEnabled()) {
+                getLogger().atInfo().log("Plugin enabled with message: " + cfg.getWelcomeMessage());
+            }
+        });
+    }
+}
+```
+
+## Built-in Codec Types
+
+Hytale provides many built-in codecs:
+
+```java
+// Primitives
+Codec.STRING
+Codec.INT
+Codec.LONG
+Codec.FLOAT
+Codec.DOUBLE
+Codec.BOOLEAN
+
+// Collections
+Codec.STRING.listOf()         // List<String>
+Codec.INT.listOf()            // List<Integer>
+someCodec.mapOf()             // Map<String, T>
+
+// Special types
+Codec.UUID
+// Vector types, etc.
+```
+
+## Complex Nested Codecs
+
+For nested objects:
+
+```java
+public class PlayerHome {
+    private String name;
+    private Vector3f position;
+    private String world;
+}
+
+public class HomeConfig {
+    private Map<UUID, List<PlayerHome>> playerHomes;
+}
+
+// Nested codec
+BuilderCodec<PlayerHome> homeCodec = BuilderCodec.builder(PlayerHome.class, PlayerHome::new)
+    .with("name", Codec.STRING, PlayerHome::getName, PlayerHome::setName)
+    .with("position", Vector3fCodec.INSTANCE, PlayerHome::getPosition, PlayerHome::setPosition)
+    .with("world", Codec.STRING, PlayerHome::getWorld, PlayerHome::setWorld)
+    .build();
+
+BuilderCodec<HomeConfig> configCodec = BuilderCodec.builder(HomeConfig.class, HomeConfig::new)
+    .with("playerHomes",
+        homeCodec.listOf().mapOf(),  // Map<String, List<PlayerHome>>
+        HomeConfig::getPlayerHomes,
+        HomeConfig::setPlayerHomes)
+    .build();
+```
+
+## Common Mistakes
+
+### Mistake 1: Missing Default Constructor
+
+```java
+// WRONG - No default constructor
+public class MyData {
+    public MyData(String name) { /* ... */ }
+}
+
+// CORRECT - Has default constructor
+public class MyData {
+    public MyData() { }  // Required!
+    public MyData(String name) { /* ... */ }
+}
+```
+
+### Mistake 2: Wrong Codec Registration Order
+
+```java
+// WRONG - Registering before codec is created
+getCodecRegistry(Interaction.CODEC).register("my-interaction", MyClass.class, codec);
+var codec = BuilderCodec.builder(...).build();  // Too late!
+
+// CORRECT - Create codec first
+var codec = BuilderCodec.builder(...).build();
+getCodecRegistry(Interaction.CODEC).register("my-interaction", MyClass.class, codec);
+```
+
+### Mistake 3: Not Using Supplier for Constructor
+
+```java
+// WRONG - Passing instance instead of supplier
+BuilderCodec.builder(MyData.class, new MyData())  // Wrong!
+
+// CORRECT - Passing constructor reference (supplier)
+BuilderCodec.builder(MyData.class, MyData::new)  // Correct!
+```
+
+## Debugging Codec Issues
+
+### Check Registration
+
+```java
+@Override
+protected void setup() {
+    var codec = BuilderCodec.builder(MyInteraction.class, MyInteraction::new).build();
+
+    try {
+        getCodecRegistry(Interaction.CODEC).register("my-interaction", MyInteraction.class, codec);
+        getLogger().atInfo().log("Successfully registered my-interaction codec");
+    } catch (Exception e) {
+        getLogger().atSevere().log("Failed to register codec", e);
+    }
+}
+```
+
+### Verify JSON Output
+
+```java
+// Test serialization
+MyData data = new MyData("test", 42);
+String json = codec.encode(data).toString();
+getLogger().atInfo().log("Serialized: " + json);
+
+// Test deserialization
+MyData loaded = codec.decode(JsonParser.parseString(json));
+getLogger().atInfo().log("Loaded name: " + loaded.getName());
+```
+
+## Summary
+
+| Task | Approach |
+|------|----------|
+| Custom interaction | `BuilderCodec` + `getCodecRegistry(Interaction.CODEC).register()` |
+| Plugin config | `BuilderCodec` + `withConfig()` |
+| Nested objects | Compose codecs with `.listOf()` and `.mapOf()` |
+| Optional fields | Use `withDefault()` or `withOptional()` |
+
+## Next Steps
+
+- [Configuration](/plugin-development/configuration) - Plugin configuration patterns
+- [Custom UI](/plugin-development/custom-ui) - Creating UI elements
+- [ECS Architecture](/plugin-development/ecs-architecture) - Component registration

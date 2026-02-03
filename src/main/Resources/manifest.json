@@ -1,0 +1,13 @@
+{
+    "Group": "com.NextLVLHasH",
+    "Name": "WebsocketNotifications",
+    "Version": "1.0",
+    "Description": "WebSocket notification system for player join/leave events with periodic polling",
+    "Authors": [
+        {
+            "Name": "NextLVLHasH"
+        }
+    ],
+    "Main": "com.NextLVLHasH.Websockets.WebsocketNotificationMod",
+    "IncludesAssetPack": false
+}

@@ -1,0 +1,145 @@
+# Hotfixes & Patch Notes
+
+Latest updates and fixes for Hytale servers and clients.
+
+## January 17, 2026 - Update 1
+
+### World & Environment
+- Added dinosaurs and other NPCs to populate the underground jungles (placeholder behaviors for now)
+- New underground jungle NPCs require generating new unexplored areas to appear
+- Devastated Lands sewers now have proper atmospheric effects and creature spawns
+- Areas beneath volcanoes now use volcanic environmental effects
+- Fixed entity placements, textures, and interiors in Feran villages
+- Removed an invisible filler block behind the bench in the Forgotten Temple
+
+### NPCs & Creatures
+- Added knockback resistance to NPCs that previously did not have it
+- Fire-themed NPCs and creatures are now immune to fire damage (still catch on fire visually)
+- The Crystal Earth Golem's combat behavior and spin attack have been improved
+- Skeletons no longer take drowning damage
+- Kweebecs are now immune to cactus and bramble environmental damage
+- Replaced Trork Shaman placeholder summon animation
+- Added proper loot tables to Kweebecs and Trorks in the Whisperfrost Frontiers
+- Livestock no longer climb on top of the Chicken Coop
+- Cautious wildlife predators (e.g., Fox) no longer engage players unless attacked
+
+### Crafting, Items & Farming
+- Base backpack now requires a Tier 1 Workbench (down from Tier 2)
+- Base backpack cost reduced to 8 Medium Leather (down from 16)
+- First backpack upgrade now requires a Tier 2 Workbench (down from Tier 3)
+- Light, Medium, and Heavy Hide now take 10 less seconds to process into Leather
+- Crafting benches can now pull materials from chests within 14 blocks horizontally (up from 7) and 6 blocks vertically (up from 4)
+- Processing benches now display item tooltips in the upgrade requirements panel
+- Raw fruits and vegetables now only grant Health Regen I; cooking them grants additional benefits
+- Dropped items should no longer get stuck on the side of blocks
+- Utility-slot torches and other handheld light sources can now be placed on the ground while wielding a pickaxe or hatchet
+- Pickaxes and hatchets are now only swung when using the primary action
+- Corn now gives 1 Essence Of Life instead of 4 when exchanged in the Farming Bench
+- Fully grown Cauliflower and Pumpkin no longer drop regular seeds when broken by hand or with any tool
+- Fully grown Eternal Crops no longer drop eternal seeds when broken by hand or with any tool
+- Wood logs now display their respective wood type in tooltips (e.g., Oak Log shows "Hardwood")
+- Recipes that required a type of "Trunk" now display as "Log" instead
+- Log type tooltips now display which trees can drop that log type
+- Woodcutter's Block is now a decorative furniture block, craftable in the Furniture Bench
+
+### Audio & Visual Effects
+- New hit and break sounds for stone
+- New hit and break sounds for ores with additional layered effects
+- Horses now properly play running sounds while mounted
+- Torch burn loop replaced with a softer ambient sound
+- Adjusted volumes for cocoon breaking, pig, piglet, and warthog sounds
+- Reduced pitch variation on sword swings
+- Added new ore breaking particles
+- Added fruit eating particles
+- A new particle effect now appears above an NPC's head when absorbing their memory
+- Updated health potion visual effects with new glitter, glow, and spiral particles
+- Fixed rope offset when held in hand
+- Fixed hand positioning for various plants, flowers, and foliage
+
+### UI, Performance & Quality of Life
+- You can now sleep starting at 7:30 PM
+- Added an information panel explaining the Memories system when interacting with The Heart of Orbis for the first time
+- Toggle Fullscreen, Switch HUD, and Take Screenshot can no longer be bound to mouse buttons
+- The game now warns when launching pre-release versions or opening worlds from different versions
+- Field of view while sprinting is now limited to 160 degrees
+- Cancelling LAN server discovery now works correctly
+- The interaction system now handles server lag spikes better
+
+### Character Customization
+- New eye types: Cat Eye, Demonic Eyes, Goat Eye, Reptile Eye
+- New mouth options: Large Mouth, Tiny Lips
+- New hair color: Lavender
+- Reworked Bangs hairstyle and brightened Dark Brown color
+- Featherbound Hood is now correctly showing for the Supporter edition
+
+### Combat & Balance
+- Weapon attacks should now check for line of sight
+- The regular Burn effect now generally deals less damage (lava remains unchanged)
+- Cactus and brambles now deal the Environmental damage type
+
+### Commands & Server
+- Fixed argument order for teleport commands: `/tp <player> <targetPlayer>`
+- Give command now supports specifying item durability
+- Whitelist and ban commands now support both online usernames and offline UUIDs
+- Server now uses "Bottleneck Bandwidth and Round-trip propagation time" (BBR) congestion control for QUIC
+- Improved authentication and session token error handling
+
+### Bug Fixes & Stability
+- Fixed a misconfiguration that allowed weapon Charged Attacks to not consume Stamina correctly when swapping hotbar slots
+- Fixed signature ready sound playing incorrectly in adventure mode
+- Fixed regular expression parsing in `/replace` command
+- Fixed an issue where signature attacks could be used without signature energy
+- Fixed some items allowing longer interaction ranges than intended
+- Fixed fluid flow behavior when stacking water sources
+- Fixed crash when using non-English folder names for screenshots
+- Fixed crash when selecting certain hairstyles with variants
+- Fixed crash caused by corrupt cached avatar previews
+- Fixed crash when the memories plugin fails to load
+- Fixed an issue where rewards from restoring memories were granted too early
+- Fixed "waiting for chunks" taking too long at &lt;128 view distance
+- Fixed crash when updating player model
+- Fixed localization loop affecting Norwegian language users
+- Fixed race condition in instance teleport that caused entity removal and re-add issues
+- Fixed session refresh for singleplayer servers
+- Fixed crop growth issues where some crops (e.g., Tomatoes) would not grow correctly
+
+---
+
+## January 15, 2026
+
+### Connectivity
+- General server stability and network improvements
+- The game will now switch to offline mode if authentication fails, instead of getting stuck
+- Fixed "invalid token" errors that could occur when your system clock was slightly out of sync
+
+### Stability
+- Improved client performance by optimizing background task scheduling
+- Fixed an issue where dropped items could get stuck inside blocks
+- Fixed a server crash that could occur in certain situations
+
+---
+
+## January 13, 2026
+
+This hotfix addresses the most critical issues reported since launch. Additional fixes for less urgent issues are in progress and will be included in upcoming patches.
+
+### Connectivity
+- Added message after server boot if authentication is required
+- Client now switches to offline mode when session becomes invalid
+
+### Stability
+- Fixed a crash that could occur when selecting certain hair styles followed by eyebrows in character creation
+- Fixed a crash when taking screenshots for people with non-English folder names
+- Fixed an issue preventing our Norwegian friends from launching the game
+- Fixed a crash when using buckets. This broke some workbenches, they will need to be destroyed and placed back down to resolve the issue
+- Preventing left mouse button from being bound to some actions
+- General stability improvements
+
+### Launcher
+- Added a warning to inform players if their computer time is out of date. This fixes certain authentication issues
+- Fixed an authentication issue that happened sporadically when logging in
+
+### Services
+- Patched a vulnerability that allowed players to spoof their username (purely visual)
+- Improved caching of game patches globally
+- Improved email sending service to handle larger volumes of emails

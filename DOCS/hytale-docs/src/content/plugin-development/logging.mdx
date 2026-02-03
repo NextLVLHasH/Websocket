@@ -1,0 +1,317 @@
+# Logging Best Practices
+
+Proper logging is essential for debugging and monitoring your Hytale plugins. This guide covers the logging APIs and best practices.
+
+## Basic Logging
+
+### Using Plugin Logger
+
+The recommended way to log from your plugin is using `JavaPlugin#getLogger()`:
+
+```java
+public class MyPlugin extends JavaPlugin {
+
+    @Override
+    protected void setup() {
+        getLogger().atInfo().log("Plugin is setting up...");
+    }
+
+    @Override
+    protected void start() {
+        getLogger().atInfo().log("Plugin started successfully!");
+    }
+
+    public void someMethod() {
+        getLogger().atFine().log("Processing something...");
+        getLogger().atWarning().log("This might be a problem");
+        getLogger().atSevere().log("Something went wrong!");
+    }
+}
+```
+
+### Log Levels
+
+| Level | Method | Use Case |
+|-------|--------|----------|
+| SEVERE | `atSevere()` | Errors, exceptions, critical failures |
+| WARNING | `atWarning()` | Potential problems, deprecated usage |
+| INFO | `atInfo()` | General information, startup/shutdown |
+| FINE | `atFine()` | Debug information |
+| FINER | `atFiner()` | More detailed debug |
+| FINEST | `atFinest()` | Most verbose debug |
+
+### Logging with Parameters
+
+```java
+// Simple string
+getLogger().atInfo().log("Player joined: " + playerName);
+
+// With exception
+try {
+    // risky operation
+} catch (Exception e) {
+    getLogger().atSevere().log("Failed to process", e);
+}
+
+// Formatted message (if supported)
+getLogger().atInfo().log("Player %s joined world %s", playerName, worldName);
+```
+
+## Log File Locations
+
+### Client/Launcher Logs
+
+```
+# Windows
+%APPDATA%\Hytale\UserData\Logs\
+
+# Linux (Flatpak)
+$HOME/.var/app/com.hypixel.HytaleLauncher/data/Hytale/UserData/Logs/
+
+# macOS
+~/Library/Application Support/Hytale/UserData/Logs/
+```
+
+### Server Logs
+
+```
+# Relative to server directory
+./logs/latest.log
+./logs/YYYY-MM-DD-N.log.gz  # Archived logs
+```
+
+### Finding Your Plugin Logs
+
+Plugin logs appear in the server logs prefixed with your plugin name:
+
+```
+[2026/01/15 14:30:00   INFO] [MyPlugin] Plugin started successfully!
+[2026/01/15 14:30:01   WARN] [MyPlugin] Configuration file not found, using defaults
+```
+
+## Static Logger Access
+
+For utility classes or non-plugin classes, use `HytaleLogger`:
+
+```java
+import com.hypixel.hytale.logger.HytaleLogger;
+
+public class MyUtility {
+    private static final HytaleLogger LOGGER = HytaleLogger.getLogger(MyUtility.class);
+
+    public static void doSomething() {
+        LOGGER.atInfo().log("Doing something...");
+    }
+}
+```
+
+## Logging Patterns
+
+### Startup/Shutdown Logging
+
+```java
+@Override
+protected void setup() {
+    getLogger().atInfo().log("=== MyPlugin Setup ===");
+    getLogger().atInfo().log("Version: " + getManifest().getVersion());
+    getLogger().atInfo().log("Registering commands...");
+    // register commands
+    getLogger().atInfo().log("Registering events...");
+    // register events
+    getLogger().atInfo().log("=== Setup Complete ===");
+}
+
+@Override
+protected void shutdown() {
+    getLogger().atInfo().log("Shutting down MyPlugin...");
+    // cleanup
+    getLogger().atInfo().log("Goodbye!");
+}
+```
+
+### Error Handling with Context
+
+```java
+public void processPlayer(Player player) {
+    try {
+        // risky operation
+        database.savePlayer(player);
+    } catch (DatabaseException e) {
+        getLogger().atSevere().log(
+            "Failed to save player data for: " + player.getName() +
+            " (UUID: " + player.getUUID() + ")",
+            e
+        );
+    }
+}
+```
+
+### Debug Logging
+
+```java
+public void complexOperation(String input) {
+    getLogger().atFine().log("Starting complex operation with input: " + input);
+
+    // Step 1
+    getLogger().atFiner().log("Step 1: Validating input...");
+    if (!isValid(input)) {
+        getLogger().atWarning().log("Invalid input received: " + input);
+        return;
+    }
+
+    // Step 2
+    getLogger().atFiner().log("Step 2: Processing...");
+    String result = process(input);
+
+    getLogger().atFine().log("Operation complete. Result: " + result);
+}
+```
+
+### Conditional Logging
+
+For expensive log operations, check if level is enabled:
+
+```java
+// Good for expensive toString() calls
+if (getLogger().isLoggable(Level.FINE)) {
+    getLogger().atFine().log("Complex object state: " + complexObject.toDetailedString());
+}
+```
+
+## Server Log Configuration
+
+Configure log levels in `config.json`:
+
+```json
+{
+  "logLevels": {
+    "MyPlugin": "FINE",
+    "com.hypixel.hytale.server": "INFO",
+    "com.hypixel.hytale.network": "WARNING"
+  }
+}
+```
+
+### Log Level Per Package
+
+```json
+{
+  "logLevels": {
+    "com.example.myplugin": "FINE",
+    "com.example.myplugin.commands": "INFO",
+    "com.example.myplugin.debug": "FINEST"
+  }
+}
+```
+
+## Common Mistakes
+
+### Mistake 1: Using System.out
+
+```java
+// WRONG - Goes to stdout, not log files
+System.out.println("Debug: " + value);
+
+// CORRECT - Uses proper logging
+getLogger().atInfo().log("Debug: " + value);
+```
+
+### Mistake 2: Expensive String Concatenation
+
+```java
+// WRONG - String concatenation happens even if log level disabled
+getLogger().atFine().log("Data: " + expensiveObject.toString());
+
+// CORRECT - Check log level first
+if (getLogger().isLoggable(Level.FINE)) {
+    getLogger().atFine().log("Data: " + expensiveObject.toString());
+}
+```
+
+### Mistake 3: Logging Sensitive Data
+
+```java
+// WRONG - Don't log passwords, tokens, etc.
+getLogger().atInfo().log("User login: " + username + " password: " + password);
+
+// CORRECT - Mask or omit sensitive data
+getLogger().atInfo().log("User login: " + username);
+```
+
+### Mistake 4: Over-Logging in Hot Paths
+
+```java
+// WRONG - Logging every tick causes performance issues
+@Override
+public void onTick() {
+    getLogger().atInfo().log("Tick!");  // 30 times per second!
+}
+
+// CORRECT - Log occasionally or at debug level
+private int tickCount = 0;
+@Override
+public void onTick() {
+    tickCount++;
+    if (tickCount % 600 == 0) {  // Every 20 seconds
+        getLogger().atFine().log("Processed 600 ticks");
+    }
+}
+```
+
+## Sentry Integration
+
+The server includes Sentry for error reporting. Severe errors are automatically sent to Sentry if configured.
+
+```java
+// Severe errors with exceptions are captured by Sentry
+try {
+    criticalOperation();
+} catch (Exception e) {
+    // This will be sent to Sentry if configured
+    getLogger().atSevere().log("Critical failure in operation", e);
+}
+```
+
+## Reading Logs
+
+### Linux/macOS
+
+```bash
+# Follow latest log
+tail -f logs/latest.log
+
+# Search for plugin messages
+grep "MyPlugin" logs/latest.log
+
+# Search for errors
+grep -E "(SEVERE|ERROR)" logs/latest.log
+
+# Last 100 lines
+tail -100 logs/latest.log
+```
+
+### Windows PowerShell
+
+```powershell
+# Follow latest log
+Get-Content logs\latest.log -Wait
+
+# Search for plugin messages
+Select-String "MyPlugin" logs\latest.log
+```
+
+## Summary
+
+| Task | Approach |
+|------|----------|
+| Plugin logging | `getLogger().atLevel().log()` |
+| Utility class logging | `HytaleLogger.getLogger(Class)` |
+| Error logging | `getLogger().atSevere().log(msg, exception)` |
+| Debug logging | `getLogger().atFine().log()` with level check |
+| Log configuration | `logLevels` in `config.json` |
+
+## Next Steps
+
+- [Configuration](/plugin-development/configuration) - Plugin configuration
+- [Common Issues](/common-issues) - Troubleshooting
+- [Performance](/server-setup/performance-optimization) - Performance monitoring

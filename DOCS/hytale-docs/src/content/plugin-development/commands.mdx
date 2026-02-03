@@ -1,0 +1,217 @@
+# Commands
+
+Create custom commands for your Hytale plugin using the server command system found in the decompiled sources.
+
+## Command Registration
+
+Commands extend `AbstractCommand` (most commonly `CommandBase` for sync commands) and are registered in your plugin's `setup()` method.
+
+```java
+public class PingCommand extends CommandBase {
+    public PingCommand() {
+        // Second parameter is a description/translation key.
+        super("ping", "myplugin.commands.ping.desc");
+    }
+
+    @Override
+    protected void executeSync(@Nonnull CommandContext context) {
+        context.sendMessage(Message.raw("Pong!"));
+    }
+}
+
+@Override
+protected void setup() {
+    getCommandRegistry().registerCommand(new PingCommand());
+}
+```
+
+`getCommandRegistry().registerCommand(...)` wires the command owner to your plugin. Use `CommandManager.get().registerSystemCommand(...)` only for system-level commands.
+
+## Arguments
+
+Commands define arguments with `withRequiredArg`, `withOptionalArg`, `withDefaultArg`, and `withFlagArg`. Argument values are read from `CommandContext`.
+
+```java
+public class EchoCommand extends CommandBase {
+    private final RequiredArg<String> textArg =
+        this.withRequiredArg("text", "myplugin.commands.echo.text", ArgTypes.STRING);
+    private final DefaultArg<Integer> timesArg =
+        this.withDefaultArg("times", "myplugin.commands.echo.times", ArgTypes.INTEGER, 1, "1");
+
+    public EchoCommand() {
+        super("echo", "myplugin.commands.echo.desc");
+    }
+
+    @Override
+    protected void executeSync(@Nonnull CommandContext context) {
+        String text = textArg.get(context);
+        int times = timesArg.get(context);
+        for (int i = 0; i < times; i++) {
+            context.sendMessage(Message.raw(text));
+        }
+    }
+}
+```
+
+Use `ArgTypes` to pick the built-in argument parsers (strings, numbers, players, worlds, assets, and more).
+
+## Sender Handling
+
+`CommandContext` provides the sender and helper methods for sender checks.
+
+```java
+if (!context.isPlayer()) {
+    context.sendMessage(Message.raw("Players only."));
+    return;
+}
+
+Player player = context.senderAs(Player.class);
+```
+
+## Sub-Commands
+
+Use `AbstractCommandCollection` for subcommands.
+
+```java
+public class WarpCommand extends AbstractCommandCollection {
+    public WarpCommand() {
+        super("warp", "myplugin.commands.warp.desc");
+        this.addSubCommand(new WarpSetCommand());
+        this.addSubCommand(new WarpGoCommand());
+    }
+}
+
+public class WarpSetCommand extends CommandBase {
+    public WarpSetCommand() {
+        super("set", "myplugin.commands.warp.set.desc");
+    }
+
+    @Override
+    protected void executeSync(@Nonnull CommandContext context) {
+        context.sendMessage(Message.raw("Warp set."));
+    }
+}
+```
+
+## Player Commands with Component Access
+
+When your command needs to access ECS components (player data, custom components, etc.), use `AbstractPlayerCommand` instead of `CommandBase`. This ensures thread-safe component access.
+
+```java
+// IMPORTANT: Use AbstractPlayerCommand for commands that access components
+public class StatsCommand extends AbstractPlayerCommand {
+
+    public StatsCommand() {
+        super("stats", "myplugin.commands.stats.desc");
+    }
+
+    @Override
+    protected void execute(Ref<EntityStore> ref, Store<EntityStore> store, CommandContext context) {
+        // Safe to access components - AbstractPlayerCommand handles thread context
+        Player player = store.getComponent(ref, Player.getComponentType());
+
+        if (player != null) {
+            // Access custom components
+            CustomStatsComponent stats = store.getComponent(ref, CustomStatsComponent.getComponentType());
+
+            if (stats != null) {
+                player.sendMessage(Message.raw("Your stats: " + stats.toString()));
+            }
+        }
+    }
+}
+```
+
+**Why use `AbstractPlayerCommand`?**
+
+Using `CommandBase` with component access causes thread errors:
+```java
+// WRONG - This will throw "Assert not in thread!" error
+public class BrokenCommand extends CommandBase {
+    @Override
+    protected void executeSync(@Nonnull CommandContext context) {
+        Ref<EntityStore> ref = context.senderAsPlayerRef();
+        Store<EntityStore> store = ref.getStore();
+
+        // CRASHES! Wrong thread
+        CustomComponent comp = store.getComponent(ref, CustomComponent.getComponentType());
+    }
+}
+```
+
+`AbstractPlayerCommand` provides `Ref<EntityStore>` and `Store<EntityStore>` in the correct thread context, avoiding these errors.
+
+See [Thread Safety Guide](/plugin-development/thread-safety) for more details.
+
+## Async Commands
+
+For long-running work, extend `AbstractAsyncCommand` and return a `CompletableFuture`.
+
+```java
+public class ExportCommand extends AbstractAsyncCommand {
+    public ExportCommand() {
+        super("export", "myplugin.commands.export.desc");
+    }
+
+    @Override
+    protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext context) {
+        return runAsync(context, () -> {
+            // Heavy work (file I/O, DB, etc.)
+            context.sendMessage(Message.raw("Export complete."));
+        }, MyPlugin.getExecutor());
+    }
+}
+
+// If you need component access after async work, use world.execute()
+public class AsyncStatsCommand extends AbstractAsyncCommand {
+    @Override
+    protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext context) {
+        return CompletableFuture.runAsync(() -> {
+            // Heavy async work (database lookup, etc.)
+            PlayerData data = database.loadData(context.senderUUID());
+
+            // Sync back to world thread for component access
+            Player player = context.senderAs(Player.class);
+            player.getWorld().execute(() -> {
+                Ref<EntityStore> ref = context.senderAsPlayerRef();
+                Store<EntityStore> store = ref.getStore();
+
+                // Safe now - on world thread
+                CustomComponent comp = store.getComponent(ref, CustomComponent.getComponentType());
+                comp.updateFromDatabase(data);
+            });
+        });
+    }
+}
+```
+
+## Built-in Commands
+
+System commands are registered in `CommandManager.registerCommands()` and by builtin plugins via `registerSystemCommand(...)`. Refer to the decompiled sources for the authoritative list in your build.
+
+## Command Type Quick Reference
+
+| Need | Use This Class |
+|------|---------------|
+| Simple command, no components | `CommandBase` |
+| Command with component access | `AbstractPlayerCommand` |
+| Heavy/blocking work | `AbstractAsyncCommand` |
+| Multiple subcommands | `AbstractCommandCollection` |
+| Console-only command | `CommandBase` with `!context.isPlayer()` check |
+
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Command not appearing in help | Ensure `setup()` registers the command with `getCommandRegistry()` |
+| `SenderTypeException` | Guard with `context.isPlayer()` or catch the exception |
+| Optional arg is null | Use `withDefaultArg(...)` or check for `null` |
+| Suggestions not shown | Use `Argument.suggest(...)` or a supported `ArgTypes` parser |
+| "Assert not in thread!" error | Use `AbstractPlayerCommand` for component access |
+| Component returns null in command | Wrong thread - use `AbstractPlayerCommand` or `world.execute()` |
+
+## Next Steps
+
+- [Permissions](/plugin-development/permissions) - Access control patterns
+- [Configuration](/plugin-development/configuration) - Store command settings
+- [Complete Examples](/plugin-development/examples) - Full plugin examples with commands

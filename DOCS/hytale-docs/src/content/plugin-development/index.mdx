@@ -1,0 +1,231 @@
+# Plugin Development
+
+Create server-side plugins for Hytale using Java.
+
+## Overview
+
+Hytale plugins are written in Java and run on the server. The plugin system uses a modern architecture with ECS (Entity Component System) patterns.
+
+## Language Support
+
+### Java (Primary)
+- **Official Support**: Yes
+- **Version**: Java 17+ required
+- **Use Cases**: All plugin development
+
+### Kotlin (Community)
+- **Official Support**: Not officially announced
+- **Compatibility**: Full (compiles to JVM bytecode)
+- **Community Consensus**: Expected to work from day one
+- **Note**: May need to shade Kotlin standard library into JAR
+
+From Discord:
+> "If it supports Java, expect Kotlin/Scala support to pop up from the community at least" - Community discussion
+
+> "Kotlin is fully compatible since it compiles to JVM bytecode" - Technical consensus
+
+### Other JVM Languages
+- **Scala, Groovy, Clojure**: Theoretically compatible
+- **Community Support**: Will depend on adoption
+
+## Plugin API
+
+### Current Status
+- **Documentation**: Not officially released yet
+- **Community Docs**: Available at hytalemodding.dev, doc.hytaledev.fr
+- **Learning Method**: Decompile server JAR (community has done this)
+
+### Adding Server Dependency
+
+**Gradle (Kotlin DSL)**:
+```kotlin
+dependencies {
+    compileOnly(files("libs/hytale-server.jar"))
+}
+```
+
+**Gradle (Groovy)**:
+```groovy
+dependencies {
+    compileOnly files('libs/hytale-server.jar')
+}
+```
+
+**Maven**:
+```xml
+<dependency>
+    <groupId>com.hytale</groupId>
+    <artifactId>server</artifactId>
+    <version>1.0.0</version>
+    <scope>system</scope>
+    <systemPath>${project.basedir}/libs/hytale-server.jar</systemPath>
+</dependency>
+```
+
+## Plugin Structure
+
+### Basic Plugin Class
+
+```java
+public class MyPlugin {
+
+    public void setup() {
+        // Register components, events, commands
+    }
+
+    public void start() {
+        // Plugin initialization
+        System.out.println("MyPlugin has started!");
+    }
+
+    public void shutdown() {
+        // Cleanup code
+        System.out.println("MyPlugin has stopped!");
+    }
+}
+```
+
+### Plugin Configuration
+- Located in `/mods` folder
+- Use `/plugin reload` command (note: file locking issues reported)
+- Most developers restart server for testing
+
+## Development Workflow
+
+### Recommended Approach
+
+1. **Setup Development Environment**
+   - Install Java and IDE
+   - Create new project with Gradle/Maven
+   - Add server JAR as dependency
+
+2. **Write Plugin Code**
+   - Implement plugin class
+   - Register event listeners
+   - Add configuration handling
+
+3. **Build Plugin**
+   ```bash
+   # Gradle
+   ./gradlew build
+
+   # Maven
+   mvn package
+   ```
+
+4. **Test Plugin**
+   - Copy JAR to server `/mods` folder
+   - Restart server (or use `/plugin reload`)
+   - Test functionality
+   - Check logs for errors
+
+5. **Debug Issues**
+   - Read server logs
+   - Use IDE debugger (remote debugging)
+   - Community Discord for help
+
+## Key Concepts
+
+### Event-Driven Architecture
+Plugins respond to events fired by the server:
+- Player join/leave
+- Block break/place
+- Entity spawn/death
+- Custom events
+
+### Entity Component System (ECS)
+Modern architecture pattern used by Hytale:
+- **Entities**: Game objects (players, mobs, items)
+- **Components**: Data attached to entities
+- **Systems**: Logic that operates on entities with specific components
+
+See [ECS Patterns](/plugin-development/ecs-patterns) for details.
+
+### Modular Design
+- Server has 70+ modules/plugins in core
+- Modules can be disabled for performance
+- Each world runs on its own thread
+
+## Plugin Capabilities
+
+### Server-Side Only
+Plugins run on the server and can:
+- Modify game logic
+- Handle events
+- Store data
+- Create custom commands
+- Implement custom game modes
+
+### Client-Side Content
+Assets downloaded from server automatically:
+- Textures
+- Models
+- Sounds
+- Data-driven content
+
+**No code execution on client initially** (may be added via graph-based scripting later).
+
+## Example Plugins
+
+Community repositories:
+- [sammwyy/Hytale-Plugin-Examples](https://github.com/sammwyy/Hytale-Plugin-Examples)
+- [vulpeslab/hytale-example-plugin](https://github.com/vulpeslab/hytale-example-plugin)
+- [FireMario211/Tpa](https://github.com/FireMario211/Tpa) - Example teleport plugin
+
+## Performance Considerations
+
+### Best Practices
+- Use asynchronous operations when possible
+- Cache frequently accessed data
+- Avoid blocking the main thread
+- Optimize event handlers
+- Clean up resources properly
+
+### Multi-Threading
+- Each world runs on its own thread
+- Be careful with shared state
+- Use thread-safe collections when needed
+
+## Distribution
+
+### Current Options
+- **CurseForge**: Already has Hytale section
+- **Modrinth**: Community wants support
+- **GitHub Releases**: Direct distribution
+- **Custom Platforms**: Community planning
+
+### Monetization
+From Discord consensus:
+- No official marketplace initially
+- Community-driven distribution
+- Donations/ads acceptable
+- Paywalls discouraged (similar to Minecraft Java model)
+
+## Learning Resources
+
+### Before Hytale
+1. Learn Java fundamentals
+2. Practice with small Java plugins or tools (optional)
+3. Study OOP and design patterns
+
+### For Hytale
+1. Review community documentation
+2. Study example plugins
+3. Decompile server JAR for reference
+4. Join community Discord
+5. Ask questions and experiment
+
+## Community Wisdom
+
+> "Don't rely solely on AI coding tools. Learn the fundamentals first, then use AI to speed up your workflow." - Community advice
+
+> "Any Java plugin project helps build familiarity with event-driven code." - Learning recommendation
+
+> "The event system is event-driven but structured around ECS patterns." - Architecture discussion
+
+## Next Steps
+
+- [Getting Started](/plugin-development/getting-started) - Create your first plugin
+- [Event System](/plugin-development/event-system) - Handle server events
+- [Player Data](/plugin-development/player-data) - Work with entities
+- [Examples](/plugin-development/examples) - Learn from existing code

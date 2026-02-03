@@ -1,0 +1,601 @@
+# Custom UI Development
+
+Hytale features a sophisticated UI system that allows plugins to create custom interfaces, pages, windows, and HUD elements. The UI is built dynamically on the server and sent to the client.
+
+## Overview
+
+The UI system consists of several components:
+
+| Component | Purpose |
+|-----------|---------|
+| **Pages** | Full-screen or overlay UI (menus, dialogs) |
+| **Windows** | Inventory/container-style interfaces |
+| **HUD** | Persistent on-screen elements |
+| **.ui Files** | Reusable BSON layout templates |
+
+## UI Architecture
+
+```
+Server Plugin                    Client
+     │                              │
+     │  CustomPage Packet           │
+     ├─────────────────────────────▶│
+     │  (BSON commands + events)    │
+     │                              │
+     │  CustomPageEvent Packet      │
+     │◀─────────────────────────────┤
+     │  (user interactions)         │
+     │                              │
+```
+
+## Creating Custom Pages
+
+### Basic Custom Page
+
+For simple, non-interactive pages:
+
+```java
+public class WelcomePage extends BasicCustomUIPage {
+
+    public WelcomePage(PlayerRef playerRef) {
+        super(playerRef, CustomPageLifetime.CanDismiss);
+    }
+
+    @Override
+    public void build(UICommandBuilder builder) {
+        // Load a .ui layout file
+        builder.append("Pages/WelcomePage.ui");
+
+        // Set text values
+        builder.set("#Title.Text", "Welcome to the Server!");
+        builder.set("#Subtitle.Text", "Press ESC to close");
+    }
+}
+```
+
+### Interactive Custom Page
+
+For pages that handle user input:
+
+```java
+public class TeamSelectPage extends InteractiveCustomUIPage<TeamSelectEventData> {
+
+    public TeamSelectPage(PlayerRef playerRef) {
+        super(playerRef, CustomPageLifetime.CanDismiss, TeamSelectEventData.CODEC);
+    }
+
+    @Override
+    public void build(Ref<EntityStore> ref, UICommandBuilder builder,
+                     UIEventBuilder eventBuilder, Store<EntityStore> store) {
+        builder.append("Pages/TeamSelect.ui");
+
+        // Add button click handlers
+        eventBuilder.addEventBinding(
+            CustomUIEventBindingType.Activating,
+            "#RedTeamButton",
+            EventData.of("Team", "red")
+        );
+
+        eventBuilder.addEventBinding(
+            CustomUIEventBindingType.Activating,
+            "#BlueTeamButton",
+            EventData.of("Team", "blue")
+        );
+    }
+
+    @Override
+    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store,
+                               TeamSelectEventData data) {
+        Player player = store.getComponent(ref, Player.getComponentType());
+
+        if ("red".equals(data.team)) {
+            player.sendMessage(Message.raw("You joined Red Team!"));
+        } else if ("blue".equals(data.team)) {
+            player.sendMessage(Message.raw("You joined Blue Team!"));
+        }
+
+        // Close the page
+        player.getPageManager().setPage(ref, store, Page.None);
+    }
+
+    // Event data class with codec
+    public static class TeamSelectEventData {
+        public String team;
+
+        public static final BuilderCodec<TeamSelectEventData> CODEC =
+            BuilderCodec.builder(TeamSelectEventData.class, TeamSelectEventData::new)
+                .withField("Team", String.class, d -> d.team, (d, v) -> d.team = v)
+                .build();
+    }
+}
+```
+
+### Opening a Page
+
+```java
+// In your plugin or command
+Player player = // get player
+PlayerRef playerRef = player.getPlayerRef();
+
+CustomUIPage page = new TeamSelectPage(playerRef);
+player.getPageManager().openCustomPage(ref, store, page);
+```
+
+## Page Lifetime
+
+The `CustomPageLifetime` enum controls how players can close pages:
+
+| Lifetime | Description |
+|----------|-------------|
+| `CantClose` | Player cannot close (forced UI) |
+| `CanDismiss` | Player can press ESC to close |
+| `CanDismissOrCloseThroughInteraction` | Close via ESC or interaction |
+
+```java
+// Force player to interact with the page
+super(playerRef, CustomPageLifetime.CantClose, eventCodec);
+
+// Allow ESC to close
+super(playerRef, CustomPageLifetime.CanDismiss, eventCodec);
+```
+
+## UICommandBuilder API
+
+The `UICommandBuilder` sends UI commands to the client:
+
+### Loading Layouts
+
+```java
+// Load a .ui file as root
+builder.append("Pages/MyPage.ui");
+
+// Append to a container
+builder.append("#ItemList", "Components/ItemSlot.ui");
+
+// Insert before an element
+builder.insertBefore("#Footer", "Components/Separator.ui");
+```
+
+### Setting Values
+
+```java
+// Set text
+builder.set("#Title.Text", "Hello World");
+builder.set("#Description.Text", Message.translation("my.translation.key"));
+
+// Set numbers
+builder.set("#HealthBar.Value", 0.75f);
+builder.set("#Counter.Text", String.valueOf(count));
+
+// Set items
+builder.set("#ItemSlot.ItemId", itemStack);
+
+// Set visibility
+builder.set("#ErrorMessage.Visible", hasError);
+
+// Set colors (as string values)
+builder.set("#StatusText.Color", "#FF0000");
+```
+
+### Managing Elements
+
+```java
+// Clear children of a container
+builder.clear("#ItemContainer");
+
+// Remove an element
+builder.remove("#OldElement");
+```
+
+### Dynamic Lists
+
+```java
+// Build a list of items
+builder.clear("#ItemList");
+
+for (int i = 0; i < items.size(); i++) {
+    String selector = "#ItemList[" + i + "]";
+
+    // Add item slot
+    builder.append("#ItemList", "Components/ItemSlot.ui");
+
+    // Set item data
+    builder.set(selector + " #Icon.ItemId", items.get(i).getItemId());
+    builder.set(selector + " #Name.Text", items.get(i).getName());
+    builder.set(selector + " #Count.Text", String.valueOf(items.get(i).getQuantity()));
+}
+```
+
+## UIEventBuilder API
+
+The `UIEventBuilder` binds client events to server handlers:
+
+### Event Types
+
+| Event Type | Description |
+|------------|-------------|
+| `Activating` | Button click / element activated |
+| `RightClicking` | Right-click on element |
+| `DoubleClicking` | Double-click |
+| `MouseEntered` | Mouse hover start |
+| `MouseExited` | Mouse hover end |
+| `ValueChanged` | Input/slider value changed |
+| `FocusGained` | Element gained focus |
+| `FocusLost` | Element lost focus |
+| `KeyDown` | Key pressed |
+| `SelectedTabChanged` | Tab selection changed |
+| `SlotClicking` | Inventory slot clicked |
+| `Dropped` | Item dropped |
+
+### Basic Event Binding
+
+```java
+// Simple click handler
+eventBuilder.addEventBinding(
+    CustomUIEventBindingType.Activating,
+    "#MyButton"
+);
+
+// Click with data
+eventBuilder.addEventBinding(
+    CustomUIEventBindingType.Activating,
+    "#DeleteButton",
+    EventData.of("Action", "delete").append("ItemId", itemId)
+);
+```
+
+### Input Events
+
+```java
+// Text input change
+eventBuilder.addEventBinding(
+    CustomUIEventBindingType.ValueChanged,
+    "#SearchInput",
+    EventData.of("@SearchQuery", "#SearchInput.Value"),
+    false  // Don't lock interface
+);
+
+// Slider change
+eventBuilder.addEventBinding(
+    CustomUIEventBindingType.ValueChanged,
+    "#VolumeSlider",
+    EventData.of("@Volume", "#VolumeSlider.Value"),
+    false
+);
+```
+
+### Event Data References
+
+Use `@` prefix to reference UI element values:
+
+```java
+EventData.of("@SearchQuery", "#SearchInput.Value")  // Gets input text
+EventData.of("@SliderValue", "#Slider.Value")       // Gets slider value
+EventData.of("@SelectedTab", "#TabBar.SelectedIndex") // Gets selected tab
+```
+
+## Updating Pages Dynamically
+
+Send incremental updates without rebuilding the entire page:
+
+```java
+@Override
+public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store,
+                           MyEventData data) {
+    if (data.searchQuery != null) {
+        // Build update
+        UICommandBuilder builder = new UICommandBuilder();
+        UIEventBuilder eventBuilder = new UIEventBuilder();
+
+        // Update only the search results
+        buildSearchResults(builder, eventBuilder, data.searchQuery);
+
+        // Send partial update (false = don't clear)
+        sendUpdate(builder, eventBuilder, false);
+    }
+}
+```
+
+## Windows (Inventory UI)
+
+Windows are used for inventory and container interfaces:
+
+```java
+public class CustomChestWindow extends ItemContainerWindow {
+
+    public CustomChestWindow(ItemContainer container) {
+        super(WindowType.Chest, container);
+    }
+
+    @Override
+    public void init(PlayerRef playerRef, WindowManager manager) {
+        super.init(playerRef, manager);
+    }
+
+    @Override
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store,
+                            WindowAction action) {
+        // Handle item moves, clicks, etc.
+    }
+}
+```
+
+### Opening Windows
+
+```java
+Player player = // get player
+Window window = new CustomChestWindow(container);
+player.getWindowManager().openWindow(window);
+
+// Open with a page
+player.getPageManager().openCustomPageWithWindows(
+    ref, store, myPage, window1, window2
+);
+```
+
+## HUD Elements
+
+Create custom HUD overlays:
+
+```java
+public class CustomHud extends CustomUIHud {
+
+    @Override
+    public void build(UICommandBuilder builder) {
+        builder.append("HUD/CustomOverlay.ui");
+        builder.set("#ScoreText.Text", "Score: 0");
+    }
+
+    public void updateScore(int score) {
+        UICommandBuilder builder = new UICommandBuilder();
+        builder.set("#ScoreText.Text", "Score: " + score);
+        update(false, builder);  // Send update
+    }
+}
+```
+
+### Managing HUD
+
+```java
+Player player = // get player
+HudManager hudManager = player.getHudManager();
+
+// Set custom HUD
+CustomHud customHud = new CustomHud();
+hudManager.setCustomHud(playerRef, customHud);
+
+// Show/hide default HUD components
+hudManager.hideHudComponents(playerRef, HudComponent.Compass);
+hudManager.showHudComponents(playerRef, HudComponent.Health, HudComponent.Stamina);
+
+// Reset to default
+hudManager.resetHud(playerRef);
+```
+
+### Default HUD Components
+
+Available `HudComponent` values:
+- `Health`, `Mana`, `Stamina`, `Oxygen`
+- `Hotbar`, `Reticle`, `Compass`
+- `Chat`, `Notifications`, `KillFeed`
+- `ObjectivePanel`, `PortalPanel`
+- `StatusIcons`, `InputBindings`
+- `Speedometer`, `AmmoIndicator`
+- And more...
+
+## UI Technology
+
+Based on Discord discussions and code analysis, Hytale's UI system uses **NoesisGUI**, an industry-standard C++ UI framework:
+
+> "NoesisGUI: C++ Game UI Framework... It has a C# SDK but it's an industry standard UI framework" - Discord community
+
+**NoesisGUI Features:**
+- XAML-based UI definitions
+- GPU-accelerated rendering
+- C# SDK integration (client-side)
+- Server sends UI commands via BSON
+
+This explains why UI files use BSON documents - the server describes the UI declaratively, and the NoesisGUI client renders it.
+
+## .ui File Format
+
+UI layouts are BSON documents. The exact format is not fully documented, but based on decompiled code:
+
+### File Structure
+
+```
+assets/
+└── myplugin/
+    └── ui/
+        ├── Pages/
+        │   └── MyPage.ui
+        └── Components/
+            └── ItemSlot.ui
+```
+
+### Element Selectors
+
+```java
+"#ElementId"                    // By ID
+"#Container[0]"                 // First child
+"#Container[0] #Child"          // Nested element
+"#Element.Property"             // Element property
+```
+
+### Using References
+
+```java
+// Reference a value from another .ui file
+Value<String> style = Value.ref("Common/Styles.ui", "ButtonStyle");
+builder.set("#MyButton.Style", style);
+```
+
+## Community Notes
+
+From Discord discussions about custom UI:
+
+> "We won't be creating chest UIs in Hytale, so it will make sense we will be using a real language to define UI for players" - Community insight
+
+> "Imagine an actual screen to join a game or selecting teams, created by designers" - On the flexibility of the system
+
+> "The server will probably send JSON data describing the UI and callback events for things like clicking on buttons" - Technical speculation (confirmed by decompiled code showing BSON commands)
+
+## Known Limitations
+
+Based on Discord community feedback, be aware of these limitations:
+
+### CustomUIHud Limitations
+
+> "Hey were you able to make an uninteractable hud at all? Been trying unsuccesfully" - Discord
+
+1. **One Custom HUD Per Player Per Plugin**: You can only have one `CustomUIHud` active per player at a time. Multiple plugins can have their own HUDs.
+
+2. **HUD Makes Player Static**: When a custom HUD is shown via certain methods, the player may become unable to move until they press ESC.
+
+3. **File Path Format**: Don't include "Hud/" prefix if your file is already in the Hud folder:
+   ```java
+   // WRONG - If file is at assets/myplugin/ui/Hud/myui.ui
+   builder.append("Hud/myui.ui");  // Might cause "could not find document" error
+
+   // CORRECT
+   builder.append("myui.ui");
+   ```
+
+4. **Hot Reload Not Supported**: Custom UI changes require a full server restart. The UI files are loaded at startup.
+
+### Page Popup Restrictions
+
+> "Custom UI requires page popups (restricts interactivity)" - Discord
+
+- Custom UI pages are modal popups, not inline overlays
+- Players must dismiss the page to continue playing
+- For always-visible UI, use CustomUIHud instead
+
+### Cannot Extend Existing UI
+
+- You cannot modify or extend the built-in inventory UI
+- Cannot add custom slots to the vanilla inventory
+- Must create entirely custom pages/windows for custom inventory features
+
+### Server Restart Required
+
+> "Not gonna work here when you need to rebuild custom UI elements server needs full restart to load new ones" - Discord
+
+UI file changes are not hot-reloadable. After modifying .ui files:
+1. Stop the server
+2. Rebuild your plugin JAR
+3. Replace the JAR in the mods folder
+4. Start the server
+
+### Known Issues (Early Access)
+
+Community members developing UI-heavy plugins have reported:
+
+> "The UI is invisible even with AlwaysOn: true" - UI rendering issues being investigated
+
+> "Says could not find document Hud/myui.ui for custom ui append command" - File path issues
+
+> "JAR Structure: Verified. manifest.json is at root, and assets/myplugin/interfaces.json + assets/myplugin/ui/my_ui.json are present" - Asset pack structure requirements
+
+### Asset Pack Integration
+
+If your plugin includes custom .ui files, set `IncludesAssetPack: true` in manifest.json:
+
+```json
+{
+  "Group": "com.example",
+  "Name": "MyUIPlugin",
+  "IncludesAssetPack": true,
+  "Main": "com.example.MyPlugin"
+}
+```
+
+## Complete Example
+
+Here's a full example of a shop page:
+
+```java
+public class ShopPage extends InteractiveCustomUIPage<ShopPageEventData> {
+
+    private final List<ShopItem> items;
+
+    public ShopPage(PlayerRef playerRef, List<ShopItem> items) {
+        super(playerRef, CustomPageLifetime.CanDismiss, ShopPageEventData.CODEC);
+        this.items = items;
+    }
+
+    @Override
+    public void build(Ref<EntityStore> ref, UICommandBuilder builder,
+                     UIEventBuilder eventBuilder, Store<EntityStore> store) {
+
+        // Load main layout
+        builder.append("Pages/ShopPage.ui");
+        builder.set("#Title.Text", "Server Shop");
+
+        // Clear and build item list
+        builder.clear("#ItemGrid");
+
+        for (int i = 0; i < items.size(); i++) {
+            ShopItem item = items.get(i);
+            String selector = "#ItemGrid[" + i + "]";
+
+            // Add item slot
+            builder.append("#ItemGrid", "Components/ShopSlot.ui");
+
+            // Set item details
+            builder.set(selector + " #Icon.ItemId", item.getItemId());
+            builder.set(selector + " #Name.Text", item.getName());
+            builder.set(selector + " #Price.Text", "$" + item.getPrice());
+
+            // Add buy button event
+            eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                selector + " #BuyButton",
+                EventData.of("Action", "buy").append("ItemIndex", String.valueOf(i))
+            );
+        }
+
+        // Close button
+        eventBuilder.addEventBinding(
+            CustomUIEventBindingType.Activating,
+            "#CloseButton"
+        );
+    }
+
+    @Override
+    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store,
+                               ShopPageEventData data) {
+        Player player = store.getComponent(ref, Player.getComponentType());
+
+        if ("buy".equals(data.action) && data.itemIndex != null) {
+            int index = Integer.parseInt(data.itemIndex);
+            ShopItem item = items.get(index);
+
+            // Process purchase...
+            player.sendMessage(Message.raw("You bought " + item.getName()));
+        }
+
+        // If no action, close was clicked
+        if (data.action == null) {
+            player.getPageManager().setPage(ref, store, Page.None);
+        }
+    }
+
+    public static class ShopPageEventData {
+        public String action;
+        public String itemIndex;
+
+        public static final BuilderCodec<ShopPageEventData> CODEC =
+            BuilderCodec.builder(ShopPageEventData.class, ShopPageEventData::new)
+                .withField("Action", String.class, d -> d.action, (d, v) -> d.action = v)
+                .withField("ItemIndex", String.class, d -> d.itemIndex, (d, v) -> d.itemIndex = v)
+                .build();
+    }
+}
+```
+
+## Next Steps
+
+- [Event System](/plugin-development/event-system) - Handle player events
+- [ECS Architecture](/plugin-development/ecs-architecture) - Work with components
+- [Complete Examples](/plugin-development/examples) - Full plugin implementations

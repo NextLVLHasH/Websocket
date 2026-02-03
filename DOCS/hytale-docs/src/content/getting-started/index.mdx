@@ -1,0 +1,79 @@
+# Getting Started with Hytale Development
+
+Welcome to Hytale plugin development! This guide will help you set up your development environment and create your first plugin.
+
+## What You'll Need
+
+### Required
+- **Java Development Kit (JDK)**: Hytale runs on Java
+  - Recommended: Eclipse Temurin 25 (mentioned by Nitrado)
+  - Minimum: Java 17 or higher
+- **IDE**: IntelliJ IDEA (most popular) or VS Code with Java extensions
+- **Hytale Server JAR**: Available at launch
+
+### Recommended
+- **Build Tool**: Gradle or Maven for dependency management
+- **Version Control**: Git for tracking your changes
+- **Basic Java Knowledge**: Understanding of OOP concepts
+
+## Learning Path
+
+If you're new to Java or plugin development, follow this recommended path:
+
+1. **Learn Java Basics**
+   - Object-Oriented Programming (OOP)
+   - Classes, methods, and data types
+   - Collections and data structures
+
+2. **Practice with Minecraft Plugins** (Optional but helpful)
+   - Spigot/Paper plugins use similar concepts
+   - Great way to understand event-driven programming
+   - Many Hytale developers come from the Minecraft community
+
+3. **Study Hytale Examples**
+   - Check out community repositories
+   - Decompile the server JAR for reference (community has done this)
+   - Review existing plugins
+
+4. **Start Building**
+   - Begin with simple plugins
+   - Join the community Discord
+   - Ask questions and share your work
+
+## Quick Start
+
+```java
+// Example: Basic plugin structure (Hytale-style lifecycle)
+public class MyFirstPlugin {
+    public void setup() {
+        // Register components, events, commands
+    }
+
+    public void start() {
+        System.out.println("My plugin is running!");
+    }
+
+    public void shutdown() {
+        // Cleanup
+    }
+}
+```
+
+## Next Steps
+
+- [Java Installation](/getting-started/java-setup) - Set up your JDK
+- [Server Download](/getting-started/server-download) - Get the server JAR
+- [Your First Plugin](/getting-started/first-plugin) - Create a simple plugin
+- [Understanding ECS](/getting-started/ecs-architecture) - Learn the architecture
+
+## Community Wisdom
+
+> "Don't rely solely on AI coding tools. Learn the fundamentals first, then use AI to speed up your workflow." - Community consensus
+
+> "If you know Java, you can use Kotlin! It compiles to JVM bytecode and is fully compatible." - From Discord discussions
+
+## Helpful Resources
+
+- [Official Server Manual](https://support.hytale.com)
+- [Community Documentation](https://hytalemodding.dev)
+- [Example Plugins Repository](https://github.com/sammwyy/Hytale-Plugin-Examples)

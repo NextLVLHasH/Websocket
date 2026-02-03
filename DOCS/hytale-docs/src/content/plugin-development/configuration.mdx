@@ -1,0 +1,671 @@
+# Configuration & Data Persistence
+
+Learn how to store configuration data and persist player information in your Hytale plugins.
+
+## Configuration File Formats
+
+Hytale supports multiple configuration formats for different purposes.
+
+### JSON Configuration
+
+JSON is used extensively in Hytale for data-driven content:
+
+**Use Cases:**
+- Server settings (`config.json`)
+- Asset definitions
+- Block/item definitions
+- Client-side configurations
+
+**Example JSON:**
+```json
+{
+  "serverName": "My Hytale Server",
+  "maxPlayers": 100,
+  "viewDistance": 12,
+  "gameMode": "survival",
+  "difficulty": "normal",
+  "Textures": [
+    {
+      "All": "Textures/texture.png",
+      "Weight": 1
+    }
+  ]
+}
+```
+
+### YAML Configuration
+
+YAML is recommended for plugin configuration:
+
+**Recommended Library:** Configurate from SpongePowered
+
+**Advantages:**
+- Supports comments
+- Human-readable
+- Easy to edit
+- Comment preservation on reload
+
+**Example YAML:**
+```yaml
+# Plugin Configuration
+plugin:
+  enabled: true
+  debug: false
+
+# Warp Settings
+warps:
+  spawn:
+    world: "default"
+    x: 0
+    y: 100
+    z: 0
+
+  pvp:
+    world: "arena"
+    x: 50
+    y: 64
+    z: -30
+
+# Economy Settings
+economy:
+  starting-balance: 1000
+  currency-symbol: "$"
+```
+
+## Reading Configuration
+
+### JSON with Gson
+
+```java
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+public class ConfigManager {
+    private final Gson gson = new GsonBuilder()
+        .setPrettyPrinting()
+        .create();
+
+    public Config loadConfig(File file) {
+        try (Reader reader = new FileReader(file)) {
+            return gson.fromJson(reader, Config.class);
+        } catch (IOException e) {
+            getLogger().atSevere().log("Failed to load config", e);
+            return new Config(); // Return defaults
+        }
+    }
+
+    public void saveConfig(Config config, File file) {
+        try (Writer writer = new FileWriter(file)) {
+            gson.toJson(config, writer);
+        } catch (IOException e) {
+            getLogger().atSevere().log("Failed to save config", e);
+        }
+    }
+}
+
+// Config class
+public class Config {
+    private String serverName = "My Server";
+    private int maxPlayers = 100;
+    private int viewDistance = 12;
+
+    // Getters and setters
+}
+```
+
+### YAML with Configurate
+
+```java
+import org.spongepowered.configurate.ConfigurationNode;
+import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
+
+public class YamlConfig {
+    private final File configFile;
+    private ConfigurationNode root;
+
+    public YamlConfig(File configFile) {
+        this.configFile = configFile;
+        load();
+    }
+
+    public void load() {
+        YamlConfigurationLoader loader = YamlConfigurationLoader.builder()
+            .file(configFile)
+            .build();
+
+        try {
+            root = loader.load();
+        } catch (IOException e) {
+            getLogger().atSevere().log("Failed to load config", e);
+        }
+    }
+
+    public String getString(String path, String def) {
+        return root.node((Object[]) path.split("\\."))
+            .getString(def);
+    }
+
+    public int getInt(String path, int def) {
+        return root.node((Object[]) path.split("\\."))
+            .getInt(def);
+    }
+
+    public void set(String path, Object value) {
+        root.node((Object[]) path.split("\\.")).set(value);
+    }
+
+    public void save() {
+        YamlConfigurationLoader loader = YamlConfigurationLoader.builder()
+            .file(configFile)
+            .build();
+
+        try {
+            loader.save(root);
+        } catch (IOException e) {
+            getLogger().atSevere().log("Failed to save config", e);
+        }
+    }
+}
+```
+
+## Configuration Best Practices
+
+### 1. Separate Config Files
+
+```
+mods/MyPlugin/
+├── config.yml          # Main plugin config
+├── warps.yml           # Warp locations
+├── homes.yml           # Player homes
+├── messages.yml        # Customizable messages
+└── data/               # Player data
+```
+
+### 2. Default Configuration
+
+```java
+public class MyPlugin extends JavaPlugin {
+
+    @Override
+    protected void setup() {
+        // Create default config if doesn't exist
+        File configFile = new File(getDataFolder(), "config.yml");
+
+        if (!configFile.exists()) {
+            saveDefaultConfig();
+        }
+
+        loadConfig();
+    }
+
+    private void saveDefaultConfig() {
+        // Copy default config from resources
+        try (InputStream input = getClass().getResourceAsStream("/config.yml")) {
+            Files.copy(input, configFile.toPath());
+        } catch (IOException e) {
+            getLogger().atSevere().log("Failed to create default config", e);
+        }
+    }
+}
+```
+
+### 3. Config Reload Command
+
+```java
+public class ReloadCommand extends CommandBase {
+
+    @Override
+    public String getName() {
+        return "reload";
+    }
+
+    @Override
+    public void execute(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("myplugin.reload")) {
+            sender.sendMessage("No permission");
+            return;
+        }
+
+        // Reload configuration
+        getPlugin().reloadConfig();
+
+        sender.sendMessage(Message.raw("✓ Configuration reloaded"));
+    }
+}
+```
+
+## Data Persistence
+
+### Database Options
+
+**Popular Choices from Community:**
+
+#### SQLite (Lightweight)
+```java
+// Good for: Small servers, simple data
+String url = "jdbc:sqlite:mods/MyPlugin/data.db";
+Connection conn = DriverManager.getConnection(url);
+```
+
+#### MySQL/MariaDB (Traditional)
+```java
+// Good for: Medium-large servers, complex queries
+String url = "jdbc:mysql://localhost:3306/hytale";
+Connection conn = DriverManager.getConnection(url, "user", "password");
+```
+
+#### PostgreSQL (Advanced)
+```java
+// Good for: Advanced features, JSON storage
+String url = "jdbc:postgresql://localhost:5432/hytale";
+Connection conn = DriverManager.getConnection(url, "user", "password");
+```
+
+#### MongoDB (NoSQL)
+```java
+// Good for: Document storage, flexible schemas
+MongoClient client = MongoClients.create("mongodb://localhost:27017");
+MongoDatabase database = client.getDatabase("hytale");
+```
+
+#### Redis (Cache/Fast Access)
+```java
+// Good for: Session data, leaderboards, caching
+Jedis jedis = new Jedis("localhost", 6379);
+jedis.set("player:uuid", "data");
+```
+
+### Repository Pattern
+
+```java
+public class UserRepository {
+    private final Connection connection;
+
+    public UserRepository(Connection connection) {
+        this.connection = connection;
+    }
+
+    public User findById(UUID uuid) {
+        String sql = "SELECT * FROM users WHERE uuid = ?";
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, uuid.toString());
+
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return mapUser(rs);
+            }
+        } catch (SQLException e) {
+            getLogger().atSevere().log("Database error", e);
+        }
+
+        return null;
+    }
+
+    public void save(User user) {
+        String sql = "INSERT OR REPLACE INTO users (uuid, name, balance, kills, deaths) " +
+                     "VALUES (?, ?, ?, ?, ?)";
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, user.getUuid().toString());
+            stmt.setString(2, user.getName());
+            stmt.setInt(3, user.getBalance());
+            stmt.setInt(4, user.getKills());
+            stmt.setInt(5, user.getDeaths());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            getLogger().atSevere().log("Database error", e);
+        }
+    }
+
+    private User mapUser(ResultSet rs) throws SQLException {
+        return new User(
+            UUID.fromString(rs.getString("uuid")),
+            rs.getString("name"),
+            rs.getInt("balance"),
+            rs.getInt("kills"),
+            rs.getInt("deaths")
+        );
+    }
+}
+
+// Register repository
+database.register(UserRepository.class);
+```
+
+### File-Based Storage
+
+#### JSON Storage
+
+```java
+public class JsonDataStore {
+    private final File dataFolder;
+    private final Gson gson;
+
+    public JsonDataStore(File dataFolder) {
+        this.dataFolder = dataFolder;
+        this.gson = new GsonBuilder().setPrettyPrinting().create();
+        dataFolder.mkdirs();
+    }
+
+    public <T> T load(UUID uuid, Class<T> type, T defaultValue) {
+        File file = new File(dataFolder, uuid.toString() + ".json");
+
+        if (!file.exists()) {
+            return defaultValue;
+        }
+
+        try (Reader reader = new FileReader(file)) {
+            return gson.fromJson(reader, type);
+        } catch (IOException e) {
+            return defaultValue;
+        }
+    }
+
+    public <T> void save(UUID uuid, T data) {
+        File file = new File(dataFolder, uuid.toString() + ".json");
+
+        try (Writer writer = new FileWriter(file)) {
+            gson.toJson(data, writer);
+        } catch (IOException e) {
+            getLogger().atSevere().log("Failed to save data", e);
+        }
+    }
+}
+
+// Usage
+PlayerData data = dataStore.load(playerUuid, PlayerData.class, new PlayerData());
+data.setKills(data.getKills() + 1);
+dataStore.save(playerUuid, data);
+```
+
+## Performance Considerations
+
+### Community Insights
+
+> "Minecraft's Essentials plugin stores 90k player files as YML - performance concern"
+
+**Recommendations:**
+- Use databases for large player counts (100+)
+- Cache frequently accessed data
+- Batch database operations
+- Use async for I/O operations
+
+### Async Data Operations
+
+```java
+public class AsyncDataStore {
+    private final ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    public CompletableFuture<PlayerData> loadAsync(UUID uuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Load from database/file
+            return loadPlayerData(uuid);
+        }, executor);
+    }
+
+    public CompletableFuture<Void> saveAsync(UUID uuid, PlayerData data) {
+        return CompletableFuture.runAsync(() -> {
+            // Save to database/file
+            savePlayerData(uuid, data);
+        }, executor);
+    }
+
+    public void shutdown() {
+        executor.shutdown();
+    }
+}
+
+// Usage
+dataStore.loadAsync(playerUuid).thenAccept(data -> {
+    // Data loaded, send to player
+    player.sendMessage(Message.raw("Kills: " + data.getKills()));
+});
+```
+
+### Caching Strategy
+
+```java
+public class CachedDataStore {
+    private final Map<UUID, PlayerData> cache = new ConcurrentHashMap<>();
+    private final DataStore backend;
+
+    public PlayerData load(UUID uuid) {
+        // Check cache first
+        if (cache.containsKey(uuid)) {
+            return cache.get(uuid);
+        }
+
+        // Load from backend
+        PlayerData data = backend.load(uuid);
+        cache.put(uuid, data);
+        return data;
+    }
+
+    public void save(UUID uuid, PlayerData data) {
+        // Update cache
+        cache.put(uuid, data);
+
+        // Save to backend async
+        CompletableFuture.runAsync(() -> {
+            backend.save(uuid, data);
+        });
+    }
+
+    public void unload(UUID uuid) {
+        // Player left - save and remove from cache
+        PlayerData data = cache.remove(uuid);
+        if (data != null) {
+            backend.save(uuid, data);
+        }
+    }
+}
+```
+
+## Config Reload Support
+
+### Hot Reloading
+
+```java
+public class MyPlugin extends JavaPlugin {
+    private YamlConfig config;
+    private Map<String, Location> warps = new HashMap<>();
+
+    @Override
+    protected void setup() {
+        loadConfig();
+        registerReloadCommand();
+    }
+
+    private void loadConfig() {
+        config = new YamlConfig(new File(getDataFolder(), "config.yml"));
+        reloadWarps();
+    }
+
+    public void reloadConfig() {
+        config.load();
+        reloadWarps();
+        getLogger().atInfo().log("Configuration reloaded");
+    }
+
+    private void reloadWarps() {
+        warps.clear();
+        // Load warps from config
+        ConfigurationNode warpsNode = config.getNode("warps");
+        for (Entry<Object, ? extends ConfigurationNode> entry : warpsNode.childrenMap().entrySet()) {
+            String name = entry.getKey().toString();
+            ConfigurationNode warpNode = entry.getValue();
+
+            Location location = new Location(
+                warpNode.node("world").getString("default"),
+                warpNode.node("x").getInt(0),
+                warpNode.node("y").getInt(0),
+                warpNode.node("z").getInt(0)
+            );
+
+            warps.put(name, location);
+        }
+    }
+}
+```
+
+## Server Configuration
+
+### config.json Settings
+
+Based on Discord discussions, server config includes:
+
+```json
+{
+  "port": 5520,
+  "maxPlayers": 100,
+  "viewDistance": 12,
+  "simulationDistance": 8,
+  "authentication": {
+    "enabled": true,
+    "persistence": "Encryption"
+  },
+  "performance": {
+    "tickRate": 30,
+    "threads": 4
+  }
+}
+```
+
+**Common Settings:**
+- Port 5520 (UDP)
+- View distance (default 32, recommended 12 for stability)
+- Authentication settings
+- Resource usage limits
+
+## Data to Persist
+
+### Player Data
+
+```java
+public class PlayerData {
+    private UUID uuid;
+    private String name;
+
+    // Gameplay
+    private int kills;
+    private int deaths;
+    private long playtime;
+
+    // Economy
+    private int balance;
+
+    // Locations
+    private Location home;
+    private Map<String, Location> warps;
+
+    // Permissions/Groups
+    private String group;
+    private List<String> permissions;
+
+    // Timestamps
+    private long firstJoin;
+    private long lastSeen;
+}
+```
+
+### World Data
+
+- Warp locations
+- Faction claims
+- Protected regions
+- Custom world settings
+
+### Plugin State
+
+- Economy balances
+- Shop inventories
+- Minigame stats
+- Custom mechanics state
+
+## Backup Strategies
+
+### Automatic Backups
+
+```java
+public class BackupManager {
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    public void startAutoBackup() {
+        // Backup every 30 minutes
+        scheduler.scheduleAtFixedRate(
+            this::createBackup,
+            30,
+            30,
+            TimeUnit.MINUTES
+        );
+    }
+
+    private void createBackup() {
+        File backup = new File("backups", "backup-" + System.currentTimeMillis() + ".zip");
+        // Create backup
+        zipDataFolder(backup);
+        deleteOldBackups();
+    }
+
+    private void deleteOldBackups() {
+        // Keep only last 7 days
+        File backupFolder = new File("backups");
+        long cutoff = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000);
+
+        for (File file : backupFolder.listFiles()) {
+            if (file.lastModified() < cutoff) {
+                file.delete();
+            }
+        }
+    }
+}
+```
+
+## Common Patterns
+
+### Configuration Manager
+
+```java
+public class ConfigManager {
+    private final Map<String, YamlConfig> configs = new HashMap<>();
+
+    public void loadConfig(String name) {
+        File file = new File(getDataFolder(), name + ".yml");
+        YamlConfig config = new YamlConfig(file);
+        configs.put(name, config);
+    }
+
+    public YamlConfig getConfig(String name) {
+        return configs.get(name);
+    }
+
+    public void reloadAll() {
+        configs.values().forEach(YamlConfig::load);
+    }
+}
+```
+
+### Data Access Layer
+
+```java
+public interface DataStore {
+    <T> T load(UUID uuid, Class<T> type);
+    <T> void save(UUID uuid, T data);
+    void delete(UUID uuid);
+}
+
+public class FileDataStore implements DataStore {
+    // File-based implementation
+}
+
+public class DatabaseDataStore implements DataStore {
+    // Database-based implementation
+}
+```
+
+## Next Steps
+
+- [Permissions](/plugin-development/permissions) - Permission systems
+- [Plugin Lifecycle](/plugin-development/lifecycle) - Startup and shutdown
+- [Complete Examples](/plugin-development/examples) - Full implementations

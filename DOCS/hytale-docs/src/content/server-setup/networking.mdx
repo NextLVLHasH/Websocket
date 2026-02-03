@@ -1,0 +1,363 @@
+# Networking & Transfer Packets
+
+Hytale introduces a revolutionary approach to server networking with built-in transfer packets, eliminating the need for traditional proxy servers like BungeeCord or Velocity.
+
+## Network Protocol
+
+Hytale uses **QUIC** (Quick UDP Internet Connections) as its transport protocol, which runs over **UDP** on port 5520 by default.
+
+> "We are targeting shipping the server for Java 25 and QUIC as the transport for the protocol." - Silkey (Tech Director)
+
+**QUIC Benefits:**
+- Built-in encryption (TLS 1.3)
+- Faster connection establishment
+- Better handling of packet loss
+- Multiplexed streams without head-of-line blocking
+- Connection migration (handles IP changes)
+
+**Technical Details from Decompiled Code:**
+- Uses Netty's QUIC codec (incubator)
+- Zstd compression for packet payloads
+- VarInt encoding for variable-length fields
+- Max payload size: configurable (default ~1.6GB theoretical max)
+- Congestion control: BBR (Bottleneck Bandwidth and Round-trip propagation time)
+
+## Transfer Packets
+
+Transfer packets allow players to seamlessly move between servers while carrying data. This is a native Hytale feature that replaces proxy-based architectures.
+
+### What Are Transfer Packets?
+
+> "We have a transfer packet with a 4KB payload which will allow you to add data when switching over to another server. There will be no need for BungeeCord-like proxies. We have like 50 of these on our Hypixel minigame network and it is costing waaaay too much money." - Slikey (Tech Director)
+
+**Key Features:**
+- 4KB payload capacity for transferring player data
+- No proxy server required
+- Native client support for server switching
+- Seamless player experience
+
+### How Transfer Packets Work
+
+```
+┌─────────────┐    Transfer Packet    ┌─────────────┐
+│   Server A  │ ──────────────────────▶│   Server B  │
+│  (Lobby)    │   + 4KB payload data   │  (Minigame) │
+└─────────────┘                        └─────────────┘
+        │                                     │
+        │      Player connection moves        │
+        └─────────────────────────────────────┘
+```
+
+1. Server A sends transfer packet to client
+2. Client disconnects from Server A
+3. Client connects to Server B with payload
+4. Server B receives player + payload data
+
+### Benefits Over Traditional Proxies
+
+| Aspect | Transfer Packets | BungeeCord/Velocity |
+|--------|-----------------|---------------------|
+| Infrastructure | Direct server-to-server | Proxy server required |
+| Cost | Lower (no proxy) | Higher (proxy hosting) |
+| Latency | Direct connection | Extra hop through proxy |
+| Complexity | Simpler setup | More complex |
+| State Transfer | 4KB payload | Custom plugin required |
+
+### Use Cases
+
+**Minigame Networks:**
+- Transfer players between lobby and game servers
+- Carry authentication/session data
+- Pass game state between servers
+
+**Hub Systems:**
+- Main hub to sub-servers
+- Regional server transfers
+- Load balancing across servers
+
+## Implementation
+
+### Sending a Transfer Packet
+
+```java
+// Transfer player to another server with data
+public void transferPlayer(Player player, String targetServer, byte[] payload) {
+    // Create transfer packet with target server and payload
+    // Payload limited to 4KB
+
+    // The player's client will:
+    // 1. Disconnect from current server
+    // 2. Connect to target server
+    // 3. Send payload to target server on connect
+}
+```
+
+### Receiving Transfer Data
+
+```java
+// Handle incoming transfer on destination server
+@Override
+protected void setup() {
+    getEventRegistry().register(PlayerConnectEvent.class, event -> {
+        // Check if player has transfer payload
+        byte[] payload = event.getTransferPayload();
+        if (payload != null) {
+            // Process transferred data
+            processTransferData(event.getPlayer(), payload);
+        }
+    });
+}
+```
+
+### Payload Considerations
+
+**Maximum Size:** 4KB (4096 bytes)
+
+**Recommended Content:**
+- Player authentication tokens
+- Session identifiers
+- Game state (compressed)
+- Preferences/settings
+
+**Not Recommended:**
+- Large inventory data (use database)
+- World data
+- Uncompressed assets
+
+## Network Architecture
+
+### Simple Hub Network
+
+```
+                    ┌───────────┐
+                    │    Hub    │
+                    │  Server   │
+                    └─────┬─────┘
+                          │
+          ┌───────────────┼───────────────┐
+          │               │               │
+    ┌─────▼─────┐   ┌─────▼─────┐   ┌─────▼─────┐
+    │  Survival │   │  Creative │   │  Minigames│
+    │  Server   │   │  Server   │   │  Server   │
+    └───────────┘   └───────────┘   └───────────┘
+```
+
+### Multi-Region Setup
+
+For networks spanning multiple regions:
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│   US Region     │     │   EU Region     │
+│  ┌───────────┐  │     │  ┌───────────┐  │
+│  │   Hub     │◀─┼─────┼─▶│   Hub     │  │
+│  └─────┬─────┘  │     │  └─────┬─────┘  │
+│        │        │     │        │        │
+│  ┌─────▼─────┐  │     │  ┌─────▼─────┐  │
+│  │  Servers  │  │     │  │  Servers  │  │
+│  └───────────┘  │     │  └───────────┘  │
+└─────────────────┘     └─────────────────┘
+```
+
+## DDoS Protection
+
+Protecting your Hytale server from DDoS attacks is crucial for public servers.
+
+### Recommended Solutions
+
+Based on community experience:
+
+| Provider | Notes |
+|----------|-------|
+| **TCPShield** | Popular in Minecraft, may work for Hytale |
+| **GSL** | Confirmed working by community |
+| **GCore** | Good alternative option |
+| **Datapacket** | Another viable option |
+| **OVH** | Built-in DDoS protection on dedicated servers |
+
+### CloudFlare Considerations
+
+> "CloudFlare's standard proxy doesn't support game ports - need Spectrum (paid) or other solutions" - Community advice
+
+**CloudFlare Spectrum:**
+- Supports non-HTTP ports
+- Paid feature
+- Works for game servers
+
+**Standard CloudFlare:**
+- Only protects HTTP/HTTPS
+- Does NOT protect game port 5520
+
+### Firewall Configuration
+
+**Linux (UFW):**
+```bash
+# Allow Hytale port (UDP for QUIC protocol)
+sudo ufw allow 5520/udp
+
+# Block everything else by default
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Enable firewall
+sudo ufw enable
+```
+
+**iptables:**
+```bash
+# Allow Hytale port (UDP for QUIC)
+iptables -A INPUT -p udp --dport 5520 -j ACCEPT
+
+# Drop other incoming traffic (be careful!)
+iptables -A INPUT -j DROP
+```
+
+## When You Still Need a Proxy
+
+While transfer packets eliminate most proxy needs, some scenarios still benefit from proxies:
+
+### Private IP Servers
+
+> "If your servers don't all have public IPs, you need a proxy. You can use a simple QUIC proxy such as Nginx to route your traffic." - Slikey
+
+**Use Nginx as TCP proxy:**
+```nginx
+stream {
+    upstream hytale_servers {
+        server 10.0.0.1:5520;
+        server 10.0.0.2:5520;
+    }
+
+    server {
+        listen 5520;
+        proxy_pass hytale_servers;
+    }
+}
+```
+
+### QUIC + TLS Considerations
+
+Community notes for QUIC-based setups:
+- QUIC runs over UDP, so TCP-only proxies will not help.
+- If you use a domain certificate, clients must connect via the hostname (SNI); connecting by IP can fail hostname validation.
+- Self-signed certs can be verified by fingerprint if you want manual validation.
+- A CA-signed cert only helps if clients actually verify it.
+
+### Load Balancing
+
+For high-traffic hubs, you may want load balancing:
+
+```
+Internet → Load Balancer → Multiple Hub Instances
+```
+
+### DDoS Mitigation Layer
+
+Adding a proxy layer for DDoS filtering:
+
+```
+Internet → DDoS Filter (TCPShield/etc) → Your Server
+```
+
+## Network Ports
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 5520 | UDP | Default Hytale game port (QUIC protocol) |
+
+### Port Forwarding
+
+Ensure port 5520 is forwarded on your router. See [Port Forwarding Guide](/server-setup/port-forwarding) for detailed instructions.
+
+### SRV Records
+
+> "SRV records NOT supported initially (A records only)" - Community discovery
+
+**What works:**
+- A records pointing to server IP
+- Direct IP:Port connections
+
+**What doesn't work (yet):**
+- SRV records for custom ports
+- Domain-only connections without port
+
+## Best Practices
+
+### For Small Servers
+
+1. Use direct connections (no proxy needed)
+2. Forward port 5520 on router
+3. Use transfer packets for multi-server setups
+4. Consider basic DDoS protection if public
+
+### For Medium Networks
+
+1. Use transfer packets between servers
+2. Implement proper authentication between servers
+3. Use database for shared player data
+4. Add DDoS protection (TCPShield, GSL, etc.)
+
+### For Large Networks
+
+1. Plan infrastructure for transfer packets
+2. Use CDN/DDoS protection
+3. Consider regional deployment
+4. Implement proper payload verification
+5. Use compression for transfer payloads
+
+## Security Considerations
+
+### Transfer Packet Security
+
+> "Always verify transfer packet signatures - prevents unauthorized transfers" - Security advice
+
+**Recommendations:**
+- Sign transfer payloads cryptographically
+- Verify sender server identity
+- Validate payload contents
+- Implement rate limiting
+
+### Server-to-Server Trust
+
+```java
+// Example: Verify transfer came from trusted server
+public boolean isValidTransfer(byte[] payload) {
+    // 1. Extract signature from payload
+    // 2. Verify against known server keys
+    // 3. Check timestamp to prevent replay attacks
+    return verified;
+}
+```
+
+## Troubleshooting
+
+### Transfer Not Working
+
+1. Verify target server is online and accessible
+2. Check payload size (max 4KB)
+3. Ensure client has correct server address
+4. Check firewall rules on both servers
+
+### High Latency Transfers
+
+1. Use geographically close servers
+2. Minimize payload size
+3. Pre-warm connections if possible
+
+### Players Getting Disconnected
+
+1. Verify network stability
+2. Check server capacity
+3. Ensure proper error handling in transfer logic
+
+## Community Resources
+
+- [Port Forwarding Guide](/server-setup/port-forwarding)
+- [Hosting Providers](/server-setup/hosting-providers)
+- [Performance Tuning](/server-setup/performance-tuning)
+
+## Next Steps
+
+- Learn about [Plugin Development](/plugin-development) to implement transfer logic
+- Set up [DDoS Protection](#ddos-protection) for public servers
+- Configure your [Firewall](#firewall-configuration) properly

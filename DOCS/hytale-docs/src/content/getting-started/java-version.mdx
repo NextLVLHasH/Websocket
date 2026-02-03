@@ -1,0 +1,318 @@
+# Java Version Requirements
+
+Hytale server and plugin development require specific Java versions. This guide clarifies the requirements and helps resolve common version-related issues.
+
+## Official Requirements
+
+| Component | Java Version | Notes |
+|-----------|--------------|-------|
+| Server Runtime | Java 25 | Full mod/plugin support |
+| Plugin Development | Java 25 | Required for compilation |
+| Legacy Support | Java 21 | Limited functionality |
+
+> "Use java 21 my love" ... "why 21? it says 25 in the docs" - Common confusion from Discord
+
+**The official requirement is Java 25** for full plugin and mod support. Some hosting providers still use Java 21, which may cause compatibility issues.
+
+## Checking Your Java Version
+
+### Command Line
+
+```bash
+# Check runtime version
+java -version
+
+# Check compiler version
+javac -version
+```
+
+**Expected output for Java 25:**
+```
+openjdk version "25" 2025-09-16
+OpenJDK Runtime Environment (build 25+...)
+OpenJDK 64-Bit Server VM (build 25+..., mixed mode, sharing)
+```
+
+### Common Version Mismatch Issues
+
+If you see errors like:
+- `Cannot resolve symbol 'hypixel'`
+- `UnsupportedClassVersionError`
+- Class file version errors
+
+These often indicate a Java version mismatch.
+
+## Installing Java 25
+
+### Windows
+
+1. **Download**: Get Java 25 from [Adoptium](https://adoptium.net/) or [Oracle](https://www.oracle.com/java/technologies/downloads/)
+
+2. **Install**: Run the installer, enable "Set JAVA_HOME variable"
+
+3. **Verify**:
+   ```cmd
+   java -version
+   ```
+
+4. **Multiple Versions**: If you have multiple Java versions:
+   ```cmd
+   # Set JAVA_HOME for current session
+   set JAVA_HOME=C:\Program Files\Java\jdk-25
+
+   # Add to PATH
+   set PATH=%JAVA_HOME%\bin;%PATH%
+   ```
+
+### macOS
+
+**Using Homebrew:**
+```bash
+# Install
+brew install openjdk@25
+
+# Link
+sudo ln -sfn /opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-25.jdk
+
+# Verify
+java -version
+```
+
+**Using SDKMAN (recommended for managing multiple versions):**
+```bash
+# Install SDKMAN
+curl -s "https://get.sdkman.io" | bash
+
+# Install Java 25
+sdk install java 25-open
+
+# Use Java 25
+sdk use java 25-open
+```
+
+### Linux
+
+**Ubuntu/Debian:**
+```bash
+# Add repository and install
+sudo apt update
+sudo apt install openjdk-25-jdk
+
+# Set as default
+sudo update-alternatives --config java
+
+# Verify
+java -version
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install java-25-openjdk java-25-openjdk-devel
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S jdk-openjdk
+```
+
+**Using SDKMAN (any Linux):**
+```bash
+curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+sdk install java 25-open
+```
+
+## IDE Configuration
+
+### IntelliJ IDEA
+
+1. **Project SDK**: File > Project Structure > Project > SDK
+   - Select Java 25 or add new SDK pointing to Java 25 installation
+
+2. **Gradle JVM**: File > Settings > Build, Execution, Deployment > Build Tools > Gradle
+   - Set Gradle JVM to Java 25
+
+3. **Language Level**: File > Project Structure > Project > Language level
+   - Set to 25
+
+### VS Code
+
+1. Install "Extension Pack for Java"
+2. Set `java.configuration.runtimes` in settings:
+   ```json
+   {
+     "java.configuration.runtimes": [
+       {
+         "name": "JavaSE-25",
+         "path": "/path/to/jdk-25",
+         "default": true
+       }
+     ]
+   }
+   ```
+
+### Eclipse
+
+1. Window > Preferences > Java > Installed JREs
+2. Add Java 25 JDK
+3. Set as default
+4. Update project compliance level to 25
+
+## Build Configuration
+
+### Gradle (build.gradle.kts)
+
+```kotlin
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
+
+// Or explicitly set source/target compatibility
+tasks.withType<JavaCompile> {
+    sourceCompatibility = "25"
+    targetCompatibility = "25"
+}
+```
+
+### Gradle (build.gradle)
+
+```groovy
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+// Or
+sourceCompatibility = '25'
+targetCompatibility = '25'
+```
+
+### Maven (pom.xml)
+
+```xml
+<properties>
+    <maven.compiler.source>25</maven.compiler.source>
+    <maven.compiler.target>25</maven.compiler.target>
+</properties>
+
+<!-- Or use compiler plugin -->
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.11.0</version>
+            <configuration>
+                <source>25</source>
+                <target>25</target>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+## Hosting Provider Notes
+
+Some hosting providers may not support Java 25 yet:
+
+| Provider | Java Version | Status |
+|----------|--------------|--------|
+| Hetzner | Java 25 | Full support |
+| OVH | Java 25 | Full support |
+| ShockByte | Java 21 | Limited mod support |
+| Bisect Hosting | Varies | Check panel settings |
+| Pterodactyl | Configurable | Set in startup |
+
+**If your host only supports Java 21:**
+- Some mods/plugins may not load
+- You may see class version errors
+- Consider switching to a host with Java 25 support
+- Or use a VPS where you control the Java version
+
+## Troubleshooting
+
+### "UnsupportedClassVersionError"
+
+**Error:**
+```
+java.lang.UnsupportedClassVersionError: com/example/MyPlugin has been compiled
+by a more recent version of the Java Runtime
+```
+
+**Solution**: Your server is running an older Java version than your plugin was compiled with. Update the server's Java to 25.
+
+### Plugin Works Locally, Fails on Server
+
+**Cause**: Local development uses Java 25, but server host uses Java 21.
+
+**Solution**:
+1. Contact host to upgrade Java
+2. Switch to a host supporting Java 25
+3. Use a VPS with manual Java installation
+
+### IDE Shows Errors But Code Compiles
+
+**Cause**: IDE using different Java version than build tool.
+
+**Solution**:
+1. Sync IDE SDK with build configuration
+2. Invalidate IDE caches and restart
+3. Reimport the project
+
+## Multiple Java Versions
+
+If you need multiple Java versions for different projects:
+
+### Using SDKMAN (Recommended)
+
+```bash
+# List available versions
+sdk list java
+
+# Install multiple versions
+sdk install java 21-open
+sdk install java 25-open
+
+# Switch between versions
+sdk use java 25-open  # Current terminal only
+sdk default java 25-open  # Set as default
+```
+
+### Using jEnv (macOS/Linux)
+
+```bash
+# Install jEnv
+brew install jenv
+
+# Add Java versions
+jenv add /path/to/jdk-21
+jenv add /path/to/jdk-25
+
+# Set global default
+jenv global 25
+
+# Set per-directory
+cd my-hytale-project
+jenv local 25
+```
+
+## Server Startup with Specific Java
+
+If you have multiple Java versions, specify the path explicitly:
+
+```bash
+# Windows
+"C:\Program Files\Java\jdk-25\bin\java" -jar HytaleServer.jar
+
+# Linux/macOS
+/usr/lib/jvm/java-25-openjdk/bin/java -jar HytaleServer.jar
+```
+
+## Next Steps
+
+- [Getting Started](/getting-started) - Complete setup guide
+- [Plugin Development](/plugin-development/getting-started) - Start building plugins
+- [Common Issues](/common-issues) - Troubleshooting guide

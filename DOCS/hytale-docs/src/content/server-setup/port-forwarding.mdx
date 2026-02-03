@@ -1,0 +1,214 @@
+# Port Forwarding & Network Setup
+
+To allow players to connect to your Hytale server, you need to properly configure your network.
+
+## Required Port
+
+**Port 5520** is the default port used by Hytale servers.
+
+- **Protocol**: UDP (QUIC)
+- **Default Port**: 5520
+- **Must be open**: For both inbound and outbound traffic
+
+> "The server will need to be authenticated to a Hytale account that owns the game. The .jar will be downloadable either via the Launcher, or via a standalone 'hytale-downloader' cli tool" - Community info
+
+## Port Forwarding Steps
+
+### 1. Find Your Local IP Address
+
+**Windows**:
+```bash
+ipconfig
+```
+Look for "IPv4 Address" under your active network connection.
+
+**macOS/Linux**:
+```bash
+ifconfig
+# or
+ip addr show
+```
+
+### 2. Access Your Router
+
+1. Open a web browser
+2. Navigate to your router's IP (commonly):
+   - `192.168.1.1`
+   - `192.168.0.1`
+   - `10.0.0.1`
+3. Log in with admin credentials
+
+### 3. Configure Port Forwarding
+
+In your router's settings:
+1. Find "Port Forwarding" or "Virtual Server" section
+2. Create new rule:
+   - **Service Name**: Hytale Server
+   - **External Port**: 5520
+   - **Internal Port**: 5520
+   - **Internal IP**: Your computer's local IP
+   - **Protocol**: UDP (important: Hytale uses QUIC over UDP, not TCP!)
+3. Save and apply changes
+
+### 4. Test Your Connection
+
+Use a port checker tool:
+- [yougetsignal.com/tools/open-ports](https://www.yougetsignal.com/tools/open-ports/)
+- Enter port 5520
+- Verify it shows as "open"
+
+## Common Issues & Solutions
+
+### Port Appears Closed
+
+**Solution 1: Firewall**
+```bash
+# Windows - Allow through firewall (UDP for QUIC)
+netsh advfirewall firewall add rule name="Hytale Server" dir=in action=allow protocol=UDP localport=5520
+
+# Linux - UFW
+sudo ufw allow 5520/udp
+
+# macOS - System Preferences
+# Security & Privacy > Firewall > Firewall Options > Add Application
+```
+
+**Solution 2: Verify Server is Running**
+The port will only show as open when the server is actively running.
+
+**Solution 3: Check Router Configuration**
+- Ensure you used your correct local IP
+- Verify the rule is enabled
+- Try rebooting your router
+
+### Players Can't Connect
+
+From Discord troubleshooting:
+
+1. **"Failed to connect / timeout"**
+   - Verify port 5520 is forwarded correctly
+   - Check firewall rules on both router and OS
+   - Ensure server is running
+   - Test with port checker tool
+
+2. **"Server requires development mode"**
+   - Check authentication settings
+   - Friends may have insecure auth enabled
+   - See [Authentication Issues](/common-issues#authentication)
+
+## UPnP (Universal Plug and Play)
+
+Some routers support automatic port forwarding via UPnP.
+
+### Enable UPnP on Router
+1. Access router settings
+2. Find UPnP option (often under Advanced or NAT settings)
+3. Enable it
+
+### Important Note from Community
+
+> "Don't rely on UPnP - manually configure port forwarding for reliability." - Discord consensus
+
+UPnP can be unreliable and may not persist after router reboots.
+
+## SRV Records
+
+### Current Status
+- **A Records**: Supported
+- **SRV Records**: NOT supported initially
+
+From Discord discussions:
+> "SRV records NOT supported initially (A records only)" - Community info
+
+You'll need to use direct IP:Port connections or A records pointing to your server.
+
+## Hosting Provider Considerations
+
+If you're using a VPS or dedicated server:
+
+### Firewall Configuration
+
+**Most providers require explicit firewall rules:**
+
+```bash
+# Example: UFW (Ubuntu) - Note: UDP for QUIC protocol
+sudo ufw allow 5520/udp
+sudo ufw reload
+
+# Example: iptables
+sudo iptables -A INPUT -p udp --dport 5520 -j ACCEPT
+sudo iptables-save
+```
+
+### Cloud Providers
+
+**AWS EC2**: Configure Security Groups to allow port 5520
+
+**Google Cloud**: Add firewall rule in VPC network settings
+
+**Azure**: Configure Network Security Group (NSG)
+
+**Oracle Cloud**: Configure security lists/groups
+
+## DDoS Protection
+
+For public servers, consider DDoS protection:
+
+### Recommended Solutions (from Discord)
+- **TCPShield**: Popular in Minecraft, may work for Hytale
+- **GSL**: Confirmed working solution
+- **GCore**: Alternative protection service
+- **Datapacket**: Another option mentioned
+
+### CloudFlare Note
+CloudFlare's proxy does NOT support game server ports - use Spectrum (paid) or other solutions.
+
+## Transfer Packets
+
+Hytale has built-in transfer packet support:
+
+- Allows servers to transfer players without proxies
+- 4KB payload size for data transfer
+- Signature verification recommended
+- Still need proxies for load balancing backend servers
+
+From Discord:
+> "Transfer packets available (no proxy like Velocity/BungeeCord needed for basic setups)" - Technical discussion
+
+## Dynamic DNS
+
+If your home IP changes frequently:
+
+### Free DDNS Services
+- No-IP
+- DuckDNS
+- Dynu
+
+These allow you to use a hostname instead of remembering your IP.
+
+## Testing Checklist
+
+- [ ] Port 5520 is forwarded in router
+- [ ] OS firewall allows port 5520
+- [ ] Server is running
+- [ ] Port checker shows port as open
+- [ ] Local connections work (localhost:5520)
+- [ ] External connections work (public IP:5520)
+
+## Community Tips
+
+> "Port forwarding issues? Test with a different port first to verify your router config is correct." - Troubleshooting advice
+
+> "If you're behind CGNAT (carrier-grade NAT), port forwarding won't work - you'll need a VPS or tunneling service like Playit.gg" - Networking discussion
+
+### CGNAT / ISP-Blocked Ports Workarounds
+
+If you cannot open ports at home:
+- **VPN overlay**: Use WireGuard/Tailscale-style networks with UDP enabled so players can reach your private IP.
+- **UDP reverse proxy**: Use a VPS to accept UDP traffic and forward it to your server (iptables or a QUIC-aware L4 proxy).
+- **Managed hosting**: Skip home hosting with a provider that gives you a public IP.
+
+## Next Steps
+
+- [Hosting Providers](/server-setup/hosting-providers) - Skip port forwarding with managed hosting
+- [Common Issues](/common-issues) - More troubleshooting help

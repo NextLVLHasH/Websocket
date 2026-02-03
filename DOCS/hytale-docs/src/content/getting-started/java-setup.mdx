@@ -1,0 +1,136 @@
+# Java Installation & Setup
+
+Hytale runs on Java, so you'll need the Java Development Kit (JDK) installed to develop plugins.
+
+## Which Java Version?
+
+Based on community discussions and hosting provider recommendations:
+
+- **Recommended**: Eclipse Temurin 25
+  - Mentioned by Nitrado as their recommended version
+  - Free and open-source
+  - Regular security updates
+
+- **Minimum**: Java 17 or higher
+  - Hytale requires a modern Java version
+  - Older versions are not supported
+
+## Installation
+
+### Windows
+
+1. Download Eclipse Temurin from [adoptium.net](https://adoptium.net)
+2. Run the installer
+3. Verify installation:
+```bash
+java -version
+javac -version
+```
+
+### macOS
+
+Using Homebrew:
+```bash
+brew install temurin
+```
+
+Or download from [adoptium.net](https://adoptium.net)
+
+### Linux
+
+#### Ubuntu/Debian
+```bash
+sudo apt update
+sudo apt install openjdk-21-jdk
+```
+
+#### Arch Linux
+```bash
+sudo pacman -S jdk-openjdk
+```
+
+#### Using SDKMAN (Recommended for managing multiple versions)
+```bash
+curl -s "https://get.sdkman.io" | bash
+sdk install java 21-tem
+```
+
+## Verify Installation
+
+After installation, verify Java is correctly installed:
+
+```bash
+java -version
+```
+
+You should see output like:
+```
+openjdk version "21.0.1" 2023-10-17
+OpenJDK Runtime Environment Temurin-21.0.1+12 (build 21.0.1+12)
+OpenJDK 64-Bit Server VM Temurin-21.0.1+12 (build 21.0.1+12, mixed mode, sharing)
+```
+
+## Set JAVA_HOME (Optional but recommended)
+
+### Windows
+1. Open System Properties > Environment Variables
+2. Add new system variable:
+   - Variable name: `JAVA_HOME`
+   - Variable value: Path to your JDK (e.g., `C:\Program Files\Java\jdk-21`)
+3. Add to PATH: `%JAVA_HOME%\bin`
+
+### macOS/Linux
+Add to your `~/.bashrc`, `~/.zshrc`, or equivalent:
+
+```bash
+export JAVA_HOME=/path/to/your/jdk
+export PATH=$JAVA_HOME/bin:$PATH
+```
+
+## IDE Setup
+
+### IntelliJ IDEA (Recommended)
+
+Most popular choice in the Hytale community.
+
+1. Download from [jetbrains.com/idea](https://www.jetbrains.com/idea/)
+   - Community Edition is free and sufficient
+2. Install and launch
+3. Configure JDK:
+   - File > Project Structure > SDKs
+   - Add your installed JDK
+
+### VS Code
+
+Alternative option with Java extensions.
+
+1. Install [VS Code](https://code.visualstudio.com)
+2. Install extensions:
+   - Extension Pack for Java
+   - Gradle for Java (if using Gradle)
+   - Maven for Java (if using Maven)
+
+## Next Steps
+
+Now that Java is installed, you can:
+- [Download the Hytale Server](/getting-started/server-download)
+- [Create Your First Plugin](/getting-started/first-plugin)
+
+## Troubleshooting
+
+### "java: command not found"
+- Ensure Java is in your PATH
+- Try restarting your terminal
+- Verify JAVA_HOME is set correctly
+
+### Multiple Java Versions
+Use a version manager:
+- **SDKMAN** (Linux/macOS): Easily switch between versions
+- **jenv** (macOS): Java version management
+- Manually set JAVA_HOME to point to the desired version
+
+## Community Tips
+
+> "Make sure you're using a 64-bit JDK for server hosting - 32-bit won't have enough memory addressing for larger servers." - From Discord
+
+> "Eclipse Temurin is the go-to recommendation - it's what hosting providers use." - Community consensus
