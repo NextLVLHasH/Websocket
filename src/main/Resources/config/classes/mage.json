@@ -1,0 +1,45 @@
+{
+  "id": "mage",
+  "display_name": "Mage",
+  "description": "Wielders of arcane power, mages command the elements and cast devastating spells.",
+  "icon_path": "ui/icons/class_mage.png",
+  "base_attributes": {
+    "STRENGTH": 8,
+    "DEXTERITY": 10,
+    "CONSTITUTION": 9,
+    "INTELLIGENCE": 15,
+    "WISDOM": 13,
+    "CHARISMA": 11
+  },
+  "attribute_growth": {
+    "STRENGTH": 0.6,
+    "DEXTERITY": 1.0,
+    "CONSTITUTION": 0.8,
+    "INTELLIGENCE": 2.2,
+    "WISDOM": 1.8,
+    "CHARISMA": 1.2
+  },
+  "starting_skills": ["mage_fireball"],
+  "base_health": 70.0,
+  "base_mana": 150.0,
+  "base_stamina": 60.0,
+  "health_per_level": 5.0,
+  "mana_per_level": 15.0,
+  "stamina_per_level": 4.0,
+  "health_regen": 1.0,
+  "mana_regen": 4.0,
+  "stamina_regen": 3.0,
+  "equipment_rules": {
+    "allowed_armor_types": ["CLOTH", "LIGHT"],
+    "allowed_weapon_types": ["STAFF", "WAND", "DAGGER", "ORB"],
+    "main_stat": "INTELLIGENCE"
+  },
+  "modifiers": {
+    "physicalDamage": 0.7,
+    "magicalDamage": 1.3,
+    "criticalChance": 0.08,
+    "criticalDamage": 1.8,
+    "spellPower": 0.2,
+    "manaCostReduction": 0.05
+  }
+}

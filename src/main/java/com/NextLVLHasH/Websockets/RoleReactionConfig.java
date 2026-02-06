@@ -9,6 +9,7 @@ public class RoleReactionConfig {
     private String discordRoleId;    // Discord role ID to assign
     private String roleName;         // Display name of the role
     private String inGamePrefix;     // Prefix to show in-game like "[Knight]"
+    private String roleColor;        // Hex color code for in-game display (e.g., "#FF5555")
     
     public RoleReactionConfig() {
         // Default constructor for JSON
@@ -19,6 +20,15 @@ public class RoleReactionConfig {
         this.discordRoleId = discordRoleId;
         this.roleName = roleName;
         this.inGamePrefix = inGamePrefix;
+        this.roleColor = null; // Will use Discord role color if not specified
+    }
+    
+    public RoleReactionConfig(String emojiId, String discordRoleId, String roleName, String inGamePrefix, String roleColor) {
+        this.emojiId = emojiId;
+        this.discordRoleId = discordRoleId;
+        this.roleName = roleName;
+        this.inGamePrefix = inGamePrefix;
+        this.roleColor = roleColor;
     }
 
     public String getEmojiId() {
@@ -51,5 +61,13 @@ public class RoleReactionConfig {
 
     public void setInGamePrefix(String inGamePrefix) {
         this.inGamePrefix = inGamePrefix;
+    }
+    
+    public String getRoleColor() {
+        return roleColor;
+    }
+    
+    public void setRoleColor(String roleColor) {
+        this.roleColor = roleColor;
     }
 }

@@ -1,16 +1,34 @@
 package com.NextLVLHasH.Websockets;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * Manages Discord <-> Hytale account linking verification
  * Uses auth codes for secure verification via game chat
+ * Persists verified links to JSON file
  */
 public class LinkVerificationManager {
+    private static final Logger LOGGER = Logger.getLogger(LinkVerificationManager.class.getName());
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     
     // Pending verification: authCode -> PendingLink
     private final ConcurrentHashMap<String, PendingLink> pendingVerifications = new ConcurrentHashMap<>();
@@ -33,7 +51,30 @@ public class LinkVerificationManager {
     // Auth code expiry in minutes
     private static final int CODE_EXPIRY_MINUTES = 10;
     
+    // Persistence
+    private final Path linksFilePath;
+    private final Path playerDataDirectory;
+    
     public LinkVerificationManager() {
+        this(null);
+    }
+    
+    public LinkVerificationManager(Path dataDirectory) {
+        // Setup persistence path
+        if (dataDirectory != null) {
+            this.linksFilePath = dataDirectory.resolve("discord_links.json");
+            this.playerDataDirectory = dataDirectory.resolve("player_data");
+            try {
+                Files.createDirectories(playerDataDirectory);
+            } catch (IOException e) {
+                LOGGER.warning("Failed to create player_data directory: " + e.getMessage());
+            }
+            loadLinks();
+        } else {
+            this.linksFilePath = null;
+            this.playerDataDirectory = null;
+        }
+        
         // Schedule cleanup of expired codes every minute
         cleanupExecutor.scheduleAtFixedRate(this::cleanupExpiredCodes, 1, 1, TimeUnit.MINUTES);
     }
@@ -114,6 +155,11 @@ public class LinkVerificationManager {
         // Store verified link
         verifiedLinks.put(pending.hytaleUuid, verified);
         discordIdToUuid.put(discordUserId, pending.hytaleUuid);
+        
+        // Persist to disk immediately
+        LOGGER.info("Link verified via Discord DM - saving immediately for: " + pending.hytaleName);
+        saveLinks();
+        saveToPlayerJson(verified);
         
         // Clean up pending
         pendingVerifications.remove(authCode);
@@ -232,6 +278,10 @@ public class LinkVerificationManager {
         verifiedLinks.put(pending.hytaleUuid, verified);
         discordIdToUuid.put(pending.discordUserId, pending.hytaleUuid);
         
+        // Persist to disk immediately
+        LOGGER.info("Link verified via game chat - saving immediately for: " + pending.hytaleName);
+        saveLinks();
+        
         // Clean up pending
         pendingVerifications.remove(authCode);
         hytaleUuidToPending.remove(pending.hytaleUuid);
@@ -248,6 +298,9 @@ public class LinkVerificationManager {
         VerifiedLink link = verifiedLinks.remove(hytaleUuid);
         if (link != null) {
             discordIdToUuid.remove(link.discordUserId);
+            // Persist change to disk immediately
+            LOGGER.info("Link removed - saving immediately");
+            saveLinks();
         }
     }
     
@@ -266,6 +319,139 @@ public class LinkVerificationManager {
             }
             return false;
         });
+    }
+    
+    /**
+     * Load verified links from JSON file
+     */
+    private void loadLinks() {
+        if (linksFilePath == null) {
+            LOGGER.warning("No data directory configured, links will not persist");
+            return;
+        }
+        
+        LOGGER.info("Looking for discord links file at: " + linksFilePath.toAbsolutePath());
+        
+        if (!Files.exists(linksFilePath)) {
+            LOGGER.info("No existing discord links file found, starting fresh");
+            return;
+        }
+        
+        try {
+            String json = Files.readString(linksFilePath);
+            LOGGER.info("Read discord links file: " + json.length() + " chars");
+            
+            Type type = new TypeToken<Map<String, LinkData>>(){}.getType();
+            Map<String, LinkData> loadedLinks = GSON.fromJson(json, type);
+            
+            if (loadedLinks != null && !loadedLinks.isEmpty()) {
+                for (Map.Entry<String, LinkData> entry : loadedLinks.entrySet()) {
+                    String hytaleUuid = entry.getKey();
+                    LinkData data = entry.getValue();
+                    
+                    VerifiedLink link = new VerifiedLink(
+                        hytaleUuid,
+                        data.hytaleName,
+                        data.discordUserId,
+                        data.discordUsername,
+                        data.verifiedAt
+                    );
+                    
+                    verifiedLinks.put(hytaleUuid, link);
+                    discordIdToUuid.put(data.discordUserId, hytaleUuid);
+                    LOGGER.info("Loaded link: " + data.hytaleName + " <-> " + data.discordUsername);
+                }
+                
+                LOGGER.info("Successfully loaded " + verifiedLinks.size() + " Discord links from file");
+            } else {
+                LOGGER.info("Discord links file was empty or null");
+            }
+        } catch (IOException e) {
+            LOGGER.warning("Failed to load Discord links: " + e.getMessage());
+            e.printStackTrace();
+        } catch (Exception e) {
+            LOGGER.warning("Error parsing Discord links file: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Save verified links to JSON file
+     */
+    private void saveLinks() {
+        if (linksFilePath == null) {
+            LOGGER.warning("Cannot save links - no data directory configured");
+            return;
+        }
+        
+        try {
+            // Ensure parent directory exists
+            Path parent = linksFilePath.getParent();
+            if (parent != null && !Files.exists(parent)) {
+                Files.createDirectories(parent);
+                LOGGER.info("Created data directory: " + parent);
+            }
+            
+            // Convert to serializable format
+            Map<String, LinkData> dataMap = new HashMap<>();
+            for (Map.Entry<String, VerifiedLink> entry : verifiedLinks.entrySet()) {
+                VerifiedLink link = entry.getValue();
+                LinkData data = new LinkData();
+                data.hytaleName = link.hytaleName;
+                data.discordUserId = link.discordUserId;
+                data.discordUsername = link.discordUsername;
+                data.verifiedAt = link.verifiedAt;
+                dataMap.put(entry.getKey(), data);
+            }
+            
+            String json = GSON.toJson(dataMap);
+            Files.writeString(linksFilePath, json);
+            LOGGER.info("Saved " + verifiedLinks.size() + " Discord links to: " + linksFilePath.toAbsolutePath());
+        } catch (IOException e) {
+            LOGGER.warning("Failed to save Discord links to " + linksFilePath + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Save Discord link info to player's individual JSON file
+     */
+    private void saveToPlayerJson(VerifiedLink link) {
+        if (playerDataDirectory == null) {
+            return;
+        }
+        
+        Path playerFile = playerDataDirectory.resolve(link.hytaleUuid + ".json");
+        
+        try {
+            // Load existing data
+            PlayerData data;
+            if (Files.exists(playerFile)) {
+                String json = Files.readString(playerFile);
+                data = GSON.fromJson(json, PlayerData.class);
+                if (data == null) {
+                    data = new PlayerData();
+                }
+            } else {
+                data = new PlayerData();
+            }
+            
+            // Update Discord link info
+            data.discordUsername = link.discordUsername;
+            data.discordUserId = link.discordUserId;
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            data.linkedAt = LocalDateTime.ofInstant(Instant.ofEpochMilli(link.verifiedAt), 
+                                                    java.time.ZoneId.systemDefault())
+                                        .format(formatter);
+            
+            // Save back to file
+            String json = GSON.toJson(data);
+            Files.writeString(playerFile, json);
+            LOGGER.info("Saved Discord link to player file: " + playerFile.toAbsolutePath());
+            
+        } catch (IOException e) {
+            LOGGER.warning("Failed to save Discord link to player JSON " + link.hytaleUuid + ": " + e.getMessage());
+        }
     }
     
     /**
@@ -331,5 +517,29 @@ public class LinkVerificationManager {
             this.hytaleName = hytaleName;
             this.message = message;
         }
+    }
+    
+    /**
+     * JSON-serializable link data for persistence
+     */
+    private static class LinkData {
+        public String hytaleName;
+        public String discordUserId;
+        public String discordUsername;
+        public long verifiedAt;
+    }
+    
+    /**
+     * Player data structure for JSON storage (shared with PrivateMessageLogger)
+     */
+    private static class PlayerData {
+        @SuppressWarnings("unused")
+        public String discordUsername;
+        @SuppressWarnings("unused")
+        public String discordUserId;
+        @SuppressWarnings("unused")
+        public String linkedAt;
+        @SuppressWarnings("unused")
+        public List<Object> privateMessages;  // List of message records
     }
 }

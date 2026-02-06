@@ -1,0 +1,13 @@
+{
+  "id": "blacksmith",
+  "display_name": "Blacksmith",
+  "description": "Master metalworkers who forge weapons and armor from raw materials.",
+  "icon_path": "ui/icons/prof_blacksmith.png",
+  "allowed_classes": [],
+  "resource_bonuses": {
+    "ore": 15,
+    "metal": 20,
+    "coal": 10
+  },
+  "max_level": 100
+}

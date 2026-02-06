@@ -1,0 +1,477 @@
+// Character Sheet UI
+// Displays player stats, attributes, and character information
+
+// ==================== LABEL STYLES ====================
+
+@TitleStyle = LabelStyle(
+    FontSize: 28,
+    TextColor: #FFD700,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@SubtitleStyle = LabelStyle(
+    FontSize: 16,
+    TextColor: #AAAAAA,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@SectionHeaderStyle = LabelStyle(
+    FontSize: 16,
+    TextColor: #FFD700,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@LabelStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #CCCCCC,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+@ValueStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@LevelStyle = LabelStyle(
+    FontSize: 18,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+// Resource bar styles
+@HealthValueStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FF5555,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@ManaValueStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #5555FF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@StaminaValueStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #55FF55,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@XPValueStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #AA55FF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+// Attribute styles - matching AttributeType colors
+@StrengthStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #DC3232,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@DexterityStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #32C832,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@IntelligenceStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #3264DC,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@ConstitutionStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #C89632,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@WisdomStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #B432C8,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@CharismaStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #FFC832,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@SkillPointsStyle = LabelStyle(
+    FontSize: 16,
+    TextColor: #55FFFF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@CloseButtonStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+// ==================== LAYOUT ====================
+
+Group {
+    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+    LayoutMode: Center;
+
+    // Main container
+    Group #CharacterSheetContainer {
+        Anchor: (Width: 400, Height: 520);
+        Background: #1a1a2e(0.95);
+
+        // Top border decoration
+        Group #TopBorder {
+            Anchor: (Top: 0, Left: 0, Right: 0, Height: 4);
+            Background: #FFD700;
+        }
+
+        // Bottom border decoration
+        Group #BottomBorder {
+            Anchor: (Bottom: 0, Left: 0, Right: 0, Height: 4);
+            Background: #FFD700;
+        }
+
+        // Left border
+        Group #LeftBorder {
+            Anchor: (Top: 0, Left: 0, Bottom: 0, Width: 2);
+            Background: #FFD700(0.5);
+        }
+
+        // Right border
+        Group #RightBorder {
+            Anchor: (Top: 0, Right: 0, Bottom: 0, Width: 2);
+            Background: #FFD700(0.5);
+        }
+
+        // Content area
+        Group #ContentArea {
+            Anchor: (Left: 16, Top: 16, Right: 16, Bottom: 16);
+
+            // ===== HEADER SECTION =====
+            Label #PlayerNameLabel {
+                Anchor: (Top: 0, Left: 0, Right: 0, Height: 36);
+                Style: @TitleStyle;
+                Text: "Player Name";
+            }
+
+            // Class and Race info
+            Label #ClassRaceLabel {
+                Anchor: (Top: 38, Left: 0, Right: 0, Height: 24);
+                Style: @SubtitleStyle;
+                Text: "Warrior - Human";
+            }
+
+            // Level display
+            Label #LevelLabel {
+                Anchor: (Top: 64, Left: 0, Right: 0, Height: 28);
+                Style: @LevelStyle;
+                Text: "Level 1";
+            }
+
+            // Separator
+            Group #HeaderSeparator {
+                Anchor: (Top: 96, Left: 20, Right: 20, Height: 2);
+                Background: #444444;
+            }
+
+            // ===== XP BAR SECTION =====
+            Group #XPSection {
+                Anchor: (Top: 106, Left: 0, Right: 0, Height: 30);
+
+                Label #XPLabel {
+                    Anchor: (Top: 0, Left: 0, Width: 80, Height: 20);
+                    Style: @LabelStyle;
+                    Text: "Experience:";
+                }
+
+                // XP bar background
+                Group #XPBarBackground {
+                    Anchor: (Top: 0, Left: 90, Right: 0, Height: 20);
+                    Background: #2a2a4a;
+
+                    // XP bar segments (10 segments, each ~28px for total ~278px)
+                    Group #XPSeg0 { Anchor: (Left: 0, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg1 { Anchor: (Left: 28, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg2 { Anchor: (Left: 56, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg3 { Anchor: (Left: 84, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg4 { Anchor: (Left: 112, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg5 { Anchor: (Left: 140, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg6 { Anchor: (Left: 168, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg7 { Anchor: (Left: 196, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg8 { Anchor: (Left: 224, Top: 2, Bottom: 2, Width: 28); Background: #AA55FF; }
+                    Group #XPSeg9 { Anchor: (Left: 252, Top: 2, Bottom: 2, Width: 26); Background: #AA55FF; }
+
+                    // XP text overlay
+                    Label #XPValueLabel {
+                        Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                        Style: @XPValueStyle;
+                        Text: "0 / 100";
+                    }
+                }
+            }
+
+            // ===== RESOURCE BARS SECTION =====
+            Label #ResourcesHeader {
+                Anchor: (Top: 144, Left: 0, Right: 0, Height: 24);
+                Style: @SectionHeaderStyle;
+                Text: "Attributes";
+            }
+
+            // Health bar
+            Group #HealthSection {
+                Anchor: (Top: 170, Left: 0, Right: 0, Height: 24);
+
+                Label #HealthLabel {
+                    Anchor: (Top: 0, Left: 0, Width: 80, Height: 20);
+                    Style: @LabelStyle;
+                    Text: "Health:";
+                }
+
+                Group #HealthBarBackground {
+                    Anchor: (Top: 0, Left: 90, Right: 0, Height: 20);
+                    Background: #3a1a1a;
+
+                    // Health bar segments (10 segments)
+                    Group #HealthSeg0 { Anchor: (Left: 0, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg1 { Anchor: (Left: 28, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg2 { Anchor: (Left: 56, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg3 { Anchor: (Left: 84, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg4 { Anchor: (Left: 112, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg5 { Anchor: (Left: 140, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg6 { Anchor: (Left: 168, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg7 { Anchor: (Left: 196, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg8 { Anchor: (Left: 224, Top: 2, Bottom: 2, Width: 28); Background: #FF5555; }
+                    Group #HealthSeg9 { Anchor: (Left: 252, Top: 2, Bottom: 2, Width: 26); Background: #FF5555; }
+
+                    Label #HealthValueLabel {
+                        Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                        Style: @HealthValueStyle;
+                        Text: "100 / 100";
+                    }
+                }
+            }
+
+            // Mana bar
+            Group #ManaSection {
+                Anchor: (Top: 196, Left: 0, Right: 0, Height: 24);
+
+                Label #ManaLabel {
+                    Anchor: (Top: 0, Left: 0, Width: 80, Height: 20);
+                    Style: @LabelStyle;
+                    Text: "Mana:";
+                }
+
+                Group #ManaBarBackground {
+                    Anchor: (Top: 0, Left: 90, Right: 0, Height: 20);
+                    Background: #1a1a3a;
+
+                    // Mana bar segments (10 segments)
+                    Group #ManaSeg0 { Anchor: (Left: 0, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg1 { Anchor: (Left: 28, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg2 { Anchor: (Left: 56, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg3 { Anchor: (Left: 84, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg4 { Anchor: (Left: 112, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg5 { Anchor: (Left: 140, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg6 { Anchor: (Left: 168, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg7 { Anchor: (Left: 196, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg8 { Anchor: (Left: 224, Top: 2, Bottom: 2, Width: 28); Background: #5555FF; }
+                    Group #ManaSeg9 { Anchor: (Left: 252, Top: 2, Bottom: 2, Width: 26); Background: #5555FF; }
+
+                    Label #ManaValueLabel {
+                        Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                        Style: @ManaValueStyle;
+                        Text: "50 / 50";
+                    }
+                }
+            }
+
+            // Stamina bar
+            Group #StaminaSection {
+                Anchor: (Top: 222, Left: 0, Right: 0, Height: 24);
+
+                Label #StaminaLabel {
+                    Anchor: (Top: 0, Left: 0, Width: 80, Height: 20);
+                    Style: @LabelStyle;
+                    Text: "Stamina:";
+                }
+
+                Group #StaminaBarBackground {
+                    Anchor: (Top: 0, Left: 90, Right: 0, Height: 20);
+                    Background: #1a3a1a;
+
+                    // Stamina bar segments (10 segments)
+                    Group #StaminaSeg0 { Anchor: (Left: 0, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg1 { Anchor: (Left: 28, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg2 { Anchor: (Left: 56, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg3 { Anchor: (Left: 84, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg4 { Anchor: (Left: 112, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg5 { Anchor: (Left: 140, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg6 { Anchor: (Left: 168, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg7 { Anchor: (Left: 196, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg8 { Anchor: (Left: 224, Top: 2, Bottom: 2, Width: 28); Background: #55FF55; }
+                    Group #StaminaSeg9 { Anchor: (Left: 252, Top: 2, Bottom: 2, Width: 26); Background: #55FF55; }
+
+                    Label #StaminaValueLabel {
+                        Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                        Style: @StaminaValueStyle;
+                        Text: "100 / 100";
+                    }
+                }
+            }
+
+            // Separator
+            Group #ResourceSeparator {
+                Anchor: (Top: 254, Left: 20, Right: 20, Height: 1);
+                Background: #444444;
+            }
+
+            // ===== ATTRIBUTES SECTION =====
+            Label #AttributesHeader {
+                Anchor: (Top: 262, Left: 0, Right: 0, Height: 24);
+                Style: @SectionHeaderStyle;
+                Text: "Attributes";
+            }
+
+            // Attributes grid (2 columns)
+            Group #AttributesContainer {
+                Anchor: (Top: 290, Left: 0, Right: 0, Height: 80);
+
+                // Left column
+                Label #StrengthLabel {
+                    Anchor: (Top: 0, Left: 0, Width: 110, Height: 22);
+                    Style: @LabelStyle;
+                    Text: "Strength:";
+                }
+                Label #StrengthValue {
+                    Anchor: (Top: 0, Left: 110, Width: 50, Height: 22);
+                    Style: @StrengthStyle;
+                    Text: "10";
+                }
+
+                Label #DexterityLabel {
+                    Anchor: (Top: 24, Left: 0, Width: 110, Height: 22);
+                    Style: @LabelStyle;
+                    Text: "Dexterity:";
+                }
+                Label #DexterityValue {
+                    Anchor: (Top: 24, Left: 110, Width: 50, Height: 22);
+                    Style: @DexterityStyle;
+                    Text: "10";
+                }
+
+                Label #ConstitutionLabel {
+                    Anchor: (Top: 48, Left: 0, Width: 110, Height: 22);
+                    Style: @LabelStyle;
+                    Text: "Constitution:";
+                }
+                Label #ConstitutionValue {
+                    Anchor: (Top: 48, Left: 110, Width: 50, Height: 22);
+                    Style: @ConstitutionStyle;
+                    Text: "10";
+                }
+
+                // Right column
+                Label #IntelligenceLabel {
+                    Anchor: (Top: 0, Left: 180, Width: 110, Height: 22);
+                    Style: @LabelStyle;
+                    Text: "Intelligence:";
+                }
+                Label #IntelligenceValue {
+                    Anchor: (Top: 0, Left: 290, Width: 50, Height: 22);
+                    Style: @IntelligenceStyle;
+                    Text: "10";
+                }
+
+                Label #WisdomLabel {
+                    Anchor: (Top: 24, Left: 180, Width: 110, Height: 22);
+                    Style: @LabelStyle;
+                    Text: "Wisdom:";
+                }
+                Label #WisdomValue {
+                    Anchor: (Top: 24, Left: 290, Width: 50, Height: 22);
+                    Style: @WisdomStyle;
+                    Text: "10";
+                }
+
+                Label #CharismaLabel {
+                    Anchor: (Top: 48, Left: 180, Width: 110, Height: 22);
+                    Style: @LabelStyle;
+                    Text: "Charisma:";
+                }
+                Label #CharismaValue {
+                    Anchor: (Top: 48, Left: 290, Width: 50, Height: 22);
+                    Style: @CharismaStyle;
+                    Text: "10";
+                }
+            }
+
+            // Separator
+            Group #AttributeSeparator {
+                Anchor: (Top: 378, Left: 20, Right: 20, Height: 1);
+                Background: #444444;
+            }
+
+            // ===== SKILL POINTS SECTION =====
+            Label #SkillPointsHeader {
+                Anchor: (Top: 388, Left: 0, Right: 0, Height: 24);
+                Style: @SectionHeaderStyle;
+                Text: "Available Points";
+            }
+
+            Label #SkillPointsValue {
+                Anchor: (Top: 414, Left: 0, Right: 0, Height: 30);
+                Style: @SkillPointsStyle;
+                Text: "0 Skill Points";
+            }
+
+            // ===== CLOSE BUTTON =====
+            Button #CloseButton {
+                Anchor: (Bottom: 0, Left: 100, Right: 100, Height: 36);
+                Background: #3a3a5a;
+
+                Label #CloseButtonLabel {
+                    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                    Style: @CloseButtonStyle;
+                    Text: "Close";
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "rogue_shadowstrike",
+  "display_name": "Shadow Strike",
+  "description": "Strike from the shadows, dealing bonus damage if unseen.",
+  "icon_path": "ui/icons/skill_rogue_1.png",
+  "type": "ACTIVE",
+  "target_type": "ENEMY",
+  "required_level": 1,
+  "prerequisite_skills": [],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 6000,
+  "mana_cost": 5.0,
+  "stamina_cost": 25.0,
+  "cast_time_millis": 0,
+  "range": 3.0,
+  "effect_data": {
+    "damage_multiplier": 1.3,
+    "stealth_bonus_multiplier": 2.0,
+    "damage_type": "PHYSICAL"
+  },
+  "scaling_attributes": {
+    "DEXTERITY": 1.4
+  }
+}

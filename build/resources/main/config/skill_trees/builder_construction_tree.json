@@ -1,0 +1,73 @@
+{
+  "id": "builder_construction_tree",
+  "display_name": "Construction",
+  "associated_class": "builder",
+  "description": "A skill tree focusing on building and crafting abilities.",
+  "icon_path": "ui/icons/tree_builder.png",
+  "root_skill_id": "builder_quick_build",
+  "nodes": {
+    "builder_quick_build": {
+      "skill": {
+        "id": "builder_quick_build",
+        "display_name": "Quick Build",
+        "description": "Temporarily increase your building speed.",
+        "icon_path": "ui/icons/skill_builder_1.png",
+        "type": "ACTIVE",
+        "target_type": "SELF",
+        "required_level": 1,
+        "prerequisite_skills": [],
+        "skill_point_cost": 1,
+        "cooldown_millis": 30000,
+        "mana_cost": 20.0,
+        "stamina_cost": 10.0,
+        "cast_time_millis": 0,
+        "range": 0.0,
+        "effect_data": {
+          "build_speed_bonus": 0.5,
+          "duration_ms": 15000
+        },
+        "scaling_attributes": {
+          "INTELLIGENCE": 0.3
+        }
+      },
+      "tier": 0,
+      "position": 0,
+      "x": 100,
+      "y": 50,
+      "child_nodes": ["builder_repair"],
+      "parent_nodes": []
+    },
+    "builder_repair": {
+      "skill": {
+        "id": "builder_repair",
+        "display_name": "Repair",
+        "description": "Repair a damaged structure or item.",
+        "icon_path": "ui/icons/skill_builder_2.png",
+        "type": "ACTIVE",
+        "target_type": "GROUND",
+        "required_level": 3,
+        "prerequisite_skills": ["builder_quick_build"],
+        "skill_point_cost": 1,
+        "cooldown_millis": 10000,
+        "mana_cost": 30.0,
+        "stamina_cost": 15.0,
+        "cast_time_millis": 2000,
+        "range": 5.0,
+        "effect_data": {
+          "repair_amount": 50.0,
+          "repair_radius": 3.0
+        },
+        "scaling_attributes": {
+          "INTELLIGENCE": 0.5,
+          "WISDOM": 0.3
+        }
+      },
+      "tier": 1,
+      "position": 0,
+      "x": 100,
+      "y": 150,
+      "child_nodes": [],
+      "parent_nodes": ["builder_quick_build"]
+    }
+  }
+}

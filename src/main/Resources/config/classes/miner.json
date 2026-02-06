@@ -1,0 +1,46 @@
+{
+  "id": "miner",
+  "display_name": "Miner",
+  "description": "Expert excavators who specialize in mining ore and discovering valuable resources.",
+  "icon_path": "ui/icons/class_miner.png",
+  "base_attributes": {
+    "STRENGTH": 13,
+    "DEXTERITY": 10,
+    "CONSTITUTION": 14,
+    "INTELLIGENCE": 10,
+    "WISDOM": 11,
+    "CHARISMA": 8
+  },
+  "attribute_growth": {
+    "STRENGTH": 1.6,
+    "DEXTERITY": 1.0,
+    "CONSTITUTION": 1.8,
+    "INTELLIGENCE": 1.0,
+    "WISDOM": 1.2,
+    "CHARISMA": 0.8
+  },
+  "starting_skills": ["miner_prospecting"],
+  "base_health": 100.0,
+  "base_mana": 50.0,
+  "base_stamina": 120.0,
+  "health_per_level": 10.0,
+  "mana_per_level": 4.0,
+  "stamina_per_level": 10.0,
+  "health_regen": 1.8,
+  "mana_regen": 1.0,
+  "stamina_regen": 5.0,
+  "equipment_rules": {
+    "allowed_armor_types": ["LIGHT", "MEDIUM", "HEAVY"],
+    "allowed_weapon_types": ["PICKAXE", "HAMMER", "AXE", "SWORD"],
+    "main_stat": "STRENGTH"
+  },
+  "modifiers": {
+    "physicalDamage": 0.95,
+    "magicalDamage": 0.8,
+    "criticalChance": 0.05,
+    "criticalDamage": 1.5,
+    "miningSpeed": 0.30,
+    "oreYield": 0.20,
+    "gemFindChance": 0.10
+  }
+}

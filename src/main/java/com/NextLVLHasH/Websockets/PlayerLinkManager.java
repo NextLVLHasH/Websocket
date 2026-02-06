@@ -1,5 +1,6 @@
 package com.NextLVLHasH.Websockets;
 
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -47,6 +48,13 @@ public class PlayerLinkManager {
     /**
      * Get Discord username for Hytale player
      */
+    public String getDiscordUsername(UUID hytaleUuid) {
+        return discordUsernames.get(hytaleUuid.toString());
+    }
+    
+    /**
+     * Get Discord username for Hytale player by UUID string
+     */
     public String getDiscordUsername(String hytaleUuid) {
         return discordUsernames.get(hytaleUuid);
     }
@@ -62,6 +70,13 @@ public class PlayerLinkManager {
     
     /**
      * Check if player is linked
+     */
+    public boolean isLinked(UUID hytaleUuid) {
+        return playerLinks.containsKey(hytaleUuid.toString());
+    }
+    
+    /**
+     * Check if player is linked by UUID string
      */
     public boolean isLinked(String hytaleUuid) {
         return playerLinks.containsKey(hytaleUuid);

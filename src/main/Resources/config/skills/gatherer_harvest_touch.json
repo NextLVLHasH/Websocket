@@ -1,0 +1,24 @@
+{
+  "id": "gatherer_harvest_touch",
+  "display_name": "Harvest Touch",
+  "description": "Instantly harvest a fully grown crop with bonus yield.",
+  "icon_path": "ui/icons/skill_gatherer_1.png",
+  "type": "ACTIVE",
+  "target_type": "GROUND",
+  "required_level": 1,
+  "prerequisite_skills": [],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 5000,
+  "mana_cost": 10.0,
+  "stamina_cost": 5.0,
+  "cast_time_millis": 0,
+  "range": 4.0,
+  "effect_data": {
+    "yield_bonus": 0.25,
+    "auto_replant": true
+  },
+  "scaling_attributes": {
+    "WISDOM": 0.3
+  }
+}

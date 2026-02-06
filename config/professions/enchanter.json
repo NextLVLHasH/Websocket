@@ -1,0 +1,14 @@
+{
+  "id": "enchanter",
+  "display_name": "Enchanter",
+  "description": "Magic imbue specialists who add mystical properties to items and equipment.",
+  "icon_path": "ui/icons/prof_enchanter.png",
+  "allowed_classes": ["mage"],
+  "resource_bonuses": {
+    "essence": 25,
+    "crystal": 20,
+    "rune": 30,
+    "dust": 15
+  },
+  "max_level": 100
+}

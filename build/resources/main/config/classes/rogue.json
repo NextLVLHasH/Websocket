@@ -1,0 +1,45 @@
+{
+  "id": "rogue",
+  "display_name": "Rogue",
+  "description": "Stealthy and precise, rogues specialize in critical strikes and evasion.",
+  "icon_path": "ui/icons/class_rogue.png",
+  "base_attributes": {
+    "STRENGTH": 10,
+    "DEXTERITY": 15,
+    "CONSTITUTION": 10,
+    "INTELLIGENCE": 11,
+    "WISDOM": 9,
+    "CHARISMA": 11
+  },
+  "attribute_growth": {
+    "STRENGTH": 1.0,
+    "DEXTERITY": 2.2,
+    "CONSTITUTION": 1.0,
+    "INTELLIGENCE": 1.2,
+    "WISDOM": 0.8,
+    "CHARISMA": 1.2
+  },
+  "starting_skills": ["rogue_shadowstrike"],
+  "base_health": 85.0,
+  "base_mana": 60.0,
+  "base_stamina": 120.0,
+  "health_per_level": 7.0,
+  "mana_per_level": 5.0,
+  "stamina_per_level": 10.0,
+  "health_regen": 1.5,
+  "mana_regen": 1.5,
+  "stamina_regen": 6.0,
+  "equipment_rules": {
+    "allowed_armor_types": ["CLOTH", "LIGHT", "MEDIUM"],
+    "allowed_weapon_types": ["DAGGER", "SWORD", "BOW", "CROSSBOW"],
+    "main_stat": "DEXTERITY"
+  },
+  "modifiers": {
+    "physicalDamage": 1.0,
+    "magicalDamage": 0.9,
+    "criticalChance": 0.15,
+    "criticalDamage": 2.0,
+    "dodgeChance": 0.12,
+    "backstabDamage": 0.25
+  }
+}

@@ -25,11 +25,28 @@ public class NotificationConfig {
     // Display settings
     private boolean showDiscordNameInGame = false;  // Show Discord username instead of Hytale username
     private boolean showRolePrefixInGame = true;    // Show role prefix like [Knight]
+    private boolean showRoleColorInGame = true;     // Apply Discord role color to in-game chat
     
     // Chat bridge settings
     private boolean enableChatBridge = true;
     private boolean syncHytaleToDiscord = true;
     private boolean syncDiscordToHytale = true;
+    
+    // Webhook settings for chat messages (with player avatars)
+    private boolean useChatWebhook = false;         // Use webhook instead of bot for chat (enables avatars)
+    private String chatWebhookUrl = "";             // Webhook URL for chat messages
+    private String playerAvatarUrlTemplate = "https://mc-heads.net/avatar/{uuid}/64"; // Player avatar URL template
+    
+    // Message formatting settings
+    private String hytaleToDiscordFormat = "**[Hytale]** `{player}`: {message}"; // Format for Hytale->Discord
+    private String discordToHytaleFormat = "[Discord] {role}{name}: {message}"; // Format for Discord->Hytale
+    private String inGameChatFormat = "{rolePrefix} {name}: {message}"; // Format for in-game chat
+    
+    // Message filtering settings
+    private boolean filterDiscordMentions = true;   // Convert @mentions to plain text
+    private boolean filterDiscordFormatting = false; // Remove **bold**, *italic*, etc.
+    private boolean filterUrls = false;             // Remove URLs from messages
+    private boolean filterCustomEmojis = true;      // Convert custom Discord emojis to :name:
     
     // Notification toggles
     private boolean enablePlayerJoinNotifications = true;
@@ -211,6 +228,97 @@ public class NotificationConfig {
 
     public void setShowRolePrefixInGame(boolean showRolePrefixInGame) {
         this.showRolePrefixInGame = showRolePrefixInGame;
+    }
+    
+    public boolean isShowRoleColorInGame() {
+        return showRoleColorInGame;
+    }
+    
+    public void setShowRoleColorInGame(boolean showRoleColorInGame) {
+        this.showRoleColorInGame = showRoleColorInGame;
+    }
+    
+    // Webhook settings getters/setters
+    public boolean isUseChatWebhook() {
+        return useChatWebhook;
+    }
+    
+    public void setUseChatWebhook(boolean useChatWebhook) {
+        this.useChatWebhook = useChatWebhook;
+    }
+    
+    public String getChatWebhookUrl() {
+        return chatWebhookUrl;
+    }
+    
+    public void setChatWebhookUrl(String chatWebhookUrl) {
+        this.chatWebhookUrl = chatWebhookUrl;
+    }
+    
+    public String getPlayerAvatarUrlTemplate() {
+        return playerAvatarUrlTemplate;
+    }
+    
+    public void setPlayerAvatarUrlTemplate(String playerAvatarUrlTemplate) {
+        this.playerAvatarUrlTemplate = playerAvatarUrlTemplate;
+    }
+    
+    // Message format getters/setters
+    public String getHytaleToDiscordFormat() {
+        return hytaleToDiscordFormat;
+    }
+    
+    public void setHytaleToDiscordFormat(String hytaleToDiscordFormat) {
+        this.hytaleToDiscordFormat = hytaleToDiscordFormat;
+    }
+    
+    public String getDiscordToHytaleFormat() {
+        return discordToHytaleFormat;
+    }
+    
+    public void setDiscordToHytaleFormat(String discordToHytaleFormat) {
+        this.discordToHytaleFormat = discordToHytaleFormat;
+    }
+    
+    public String getInGameChatFormat() {
+        return inGameChatFormat;
+    }
+    
+    public void setInGameChatFormat(String inGameChatFormat) {
+        this.inGameChatFormat = inGameChatFormat;
+    }
+    
+    // Message filtering getters/setters
+    public boolean isFilterDiscordMentions() {
+        return filterDiscordMentions;
+    }
+    
+    public void setFilterDiscordMentions(boolean filterDiscordMentions) {
+        this.filterDiscordMentions = filterDiscordMentions;
+    }
+    
+    public boolean isFilterDiscordFormatting() {
+        return filterDiscordFormatting;
+    }
+    
+    public void setFilterDiscordFormatting(boolean filterDiscordFormatting) {
+        this.filterDiscordFormatting = filterDiscordFormatting;
+    }
+    
+    public boolean isFilterUrls() {
+        return filterUrls;
+    }
+    
+    public void setFilterUrls(boolean filterUrls) {
+        this.filterUrls = filterUrls;
+    }
+    
+    public boolean isFilterCustomEmojis() {
+        return filterCustomEmojis;
+    }
+    
+    public void setFilterCustomEmojis(boolean filterCustomEmojis) {
+        this.filterCustomEmojis = filterCustomEmojis;
     }
     
     // WebSocket server URL getters/setters

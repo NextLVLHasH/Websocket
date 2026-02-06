@@ -1,0 +1,25 @@
+{
+  "id": "miner_prospecting",
+  "display_name": "Prospecting",
+  "description": "Sense nearby ore deposits for a short time.",
+  "icon_path": "ui/icons/skill_miner_1.png",
+  "type": "ACTIVE",
+  "target_type": "SELF",
+  "required_level": 1,
+  "prerequisite_skills": [],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 60000,
+  "mana_cost": 25.0,
+  "stamina_cost": 5.0,
+  "cast_time_millis": 1500,
+  "range": 0.0,
+  "effect_data": {
+    "detection_radius": 20.0,
+    "duration_ms": 30000,
+    "highlight_ores": true
+  },
+  "scaling_attributes": {
+    "WISDOM": 0.5
+  }
+}

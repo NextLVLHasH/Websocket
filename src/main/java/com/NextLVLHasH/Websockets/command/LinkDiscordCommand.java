@@ -27,9 +27,7 @@ public class LinkDiscordCommand extends CommandBase {
     
     // Define the discord username argument using Hytale's argument system
     private final RequiredArg<String> discordUsernameArg;
-    
-    @SuppressWarnings("null")
-    public LinkDiscordCommand(WebsocketNotificationMod plugin) {
+     public LinkDiscordCommand(WebsocketNotificationMod plugin) {
         super("link", "websockets.commands.link.desc");
         this.plugin = plugin;
         
@@ -100,22 +98,37 @@ public class LinkDiscordCommand extends CommandBase {
         
         plugin.getLogger().atInfo().log("Generated auth code for " + playerName + " -> " + discordUsername);
         
-        // Send instructions to player (do NOT show the code here)
-        context.sendMessage(Message.raw(" "));
-        context.sendMessage(Message.raw("=== Discord Link Request ==="));
-        context.sendMessage(Message.raw("Linking to Discord user: " + discordUsername));
-        context.sendMessage(Message.raw(" "));
-        context.sendMessage(Message.raw("A verification code has been sent to your Discord DM."));
-        context.sendMessage(Message.raw("Check your Discord messages from the bot."));
-        context.sendMessage(Message.raw(" "));
-        context.sendMessage(Message.raw("Once you have the code, type it in THIS game chat."));
-        context.sendMessage(Message.raw(" "));
-        context.sendMessage(Message.raw("Code expires in 10 minutes"));
-        context.sendMessage(Message.raw(" "));
+        // Try to send DM to the Discord user with the code
+        boolean dmSent = plugin.getDiscordBot().sendLinkRequestDM(discordUsername, playerName, authCode);
         
-        // Send DM to the Discord user with the code
-        plugin.getDiscordBot().sendLinkRequestDM(discordUsername, playerName, authCode);
-        
-        plugin.getLogger().atInfo().log("Link request created for " + playerName + " -> " + discordUsername);
+        if (dmSent) {
+            // Send instructions to player
+            context.sendMessage(Message.raw(" "));
+            context.sendMessage(Message.raw("=== Discord Link Request ==="));
+            context.sendMessage(Message.raw("Linking to Discord user: " + discordUsername));
+            context.sendMessage(Message.raw(" "));
+            context.sendMessage(Message.raw("A verification code has been sent to your Discord DM."));
+            context.sendMessage(Message.raw("Check your Discord messages from the bot."));
+            context.sendMessage(Message.raw(" "));
+            context.sendMessage(Message.raw("Once you have the code, type it in THIS game chat."));
+            context.sendMessage(Message.raw(" "));
+            context.sendMessage(Message.raw("Code expires in 10 minutes"));
+            context.sendMessage(Message.raw(" "));
+            
+            plugin.getLogger().atInfo().log("Link request created for " + playerName + " -> " + discordUsername);
+        } else {
+            // Failed to find Discord user - give helpful feedback
+            context.sendMessage(Message.raw(" "));
+            context.sendMessage(Message.raw("=== Discord Link Failed ==="));
+            context.sendMessage(Message.raw("Could not find Discord user: " + discordUsername));
+            context.sendMessage(Message.raw(" "));
+            context.sendMessage(Message.raw("Please make sure:"));
+            context.sendMessage(Message.raw("1. The Discord username is spelled correctly"));
+            context.sendMessage(Message.raw("2. The user is a member of the linked Discord server"));
+            context.sendMessage(Message.raw("3. Try using their exact Discord display name"));
+            context.sendMessage(Message.raw(" "));
+            
+            plugin.getLogger().atWarning().log("Failed to find Discord user: " + discordUsername + " for " + playerName);
+        }
     }
 }

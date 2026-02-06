@@ -1,0 +1,329 @@
+// Combat Log UI
+// Displays combat events with timestamps and colored entries by type
+
+// Title style - gold colored
+@TitleStyle = LabelStyle(
+    FontSize: 18,
+    TextColor: #FFD700,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+// Timestamp style - gray, smaller
+@TimestampStyle = LabelStyle(
+    FontSize: 10,
+    TextColor: #888888,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+// Damage entry style - red
+@DamageStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FF5555,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+// Heal entry style - green
+@HealStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #55FF55,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+// Effect applied style - cyan
+@EffectAppliedStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #55FFFF,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+// Effect removed style - yellow
+@EffectRemovedStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FFFF55,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+// Level up style - gold
+@LevelUpStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FFD700,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+// Skill used style - magenta
+@SkillUsedStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FF55FF,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+// Info/default style - white
+@InfoStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #CCCCCC,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+// Button style
+@ButtonTextStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@ButtonHoverStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FFD700,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+Group {
+    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+
+    // Main container - positioned bottom-left
+    Group #CombatLogContainer {
+        Anchor: (Left: 16, Bottom: 16, Width: 350, Height: 280);
+        Background: #1a1a2e(0.85);
+
+        // Top border decoration
+        Group #TopBorder {
+            Anchor: (Top: 0, Left: 0, Right: 0, Height: 2);
+            Background: #FFD700;
+        }
+
+        // Header area with title and close button
+        Group #HeaderArea {
+            Anchor: (Top: 2, Left: 0, Right: 0, Height: 28);
+            Background: #252540(0.9);
+
+            // Title
+            Label #TitleLabel {
+                Anchor: (Top: 0, Left: 8, Right: 70, Bottom: 0);
+                Style: @TitleStyle;
+                Text: "Combat Log";
+            }
+
+            // Close button
+            Button #CloseButton {
+                Anchor: (Top: 4, Right: 8, Width: 20, Height: 20);
+                Background: #443333;
+
+                Label {
+                    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                    Style: @ButtonTextStyle;
+                    Text: "X";
+                }
+            }
+
+            // Clear button
+            Button #ClearButton {
+                Anchor: (Top: 4, Right: 32, Width: 50, Height: 20);
+                Background: #333344;
+
+                Label {
+                    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                    Style: @ButtonTextStyle;
+                    Text: "Clear";
+                }
+            }
+        }
+
+        // Log entries area (no ScrollView - using fixed entry slots)
+        Group #LogEntriesContainer {
+            Anchor: (Top: 32, Left: 4, Right: 4, Bottom: 4);
+            Background: #0a0a1a(0.5);
+
+                // Entry rows will be added dynamically via UICommandBuilder
+                // Template for each entry (10 visible slots):
+                
+                Group #Entry0 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry0Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry0Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry1 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry1Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry1Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry2 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry2Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry2Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry3 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry3Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry3Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry4 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry4Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry4Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry5 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry5Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry5Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry6 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry6Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry6Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry7 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry7Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry7Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry8 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry8Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry8Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+
+                Group #Entry9 {
+                    Anchor: (Left: 0, Right: 0, Height: 22);
+                    Visible: false;
+                    
+                    Label #Entry9Timestamp {
+                        Anchor: (Top: 0, Left: 0, Width: 50, Bottom: 0);
+                        Style: @TimestampStyle;
+                        Text: "";
+                    }
+                    
+                    Label #Entry9Text {
+                        Anchor: (Top: 0, Left: 52, Right: 0, Bottom: 0);
+                        Style: @InfoStyle;
+                        Text: "";
+                    }
+                }
+            }
+
+        // Bottom border decoration
+        Group #BottomBorder {
+            Anchor: (Bottom: 0, Left: 0, Right: 0, Height: 2);
+            Background: #FFD700;
+        }
+    }
+}

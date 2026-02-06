@@ -1,0 +1,46 @@
+{
+  "id": "builder",
+  "display_name": "Builder",
+  "description": "Master craftsmen who excel at construction, repair, and creating items.",
+  "icon_path": "ui/icons/class_builder.png",
+  "base_attributes": {
+    "STRENGTH": 12,
+    "DEXTERITY": 12,
+    "CONSTITUTION": 11,
+    "INTELLIGENCE": 13,
+    "WISDOM": 10,
+    "CHARISMA": 10
+  },
+  "attribute_growth": {
+    "STRENGTH": 1.4,
+    "DEXTERITY": 1.4,
+    "CONSTITUTION": 1.2,
+    "INTELLIGENCE": 1.6,
+    "WISDOM": 1.0,
+    "CHARISMA": 1.0
+  },
+  "starting_skills": ["builder_quick_build"],
+  "base_health": 90.0,
+  "base_mana": 80.0,
+  "base_stamina": 100.0,
+  "health_per_level": 8.0,
+  "mana_per_level": 6.0,
+  "stamina_per_level": 8.0,
+  "health_regen": 1.5,
+  "mana_regen": 2.0,
+  "stamina_regen": 5.0,
+  "equipment_rules": {
+    "allowed_armor_types": ["CLOTH", "LIGHT", "MEDIUM"],
+    "allowed_weapon_types": ["HAMMER", "AXE", "SWORD", "SHIELD"],
+    "main_stat": "INTELLIGENCE"
+  },
+  "modifiers": {
+    "physicalDamage": 0.9,
+    "magicalDamage": 0.9,
+    "criticalChance": 0.05,
+    "criticalDamage": 1.5,
+    "buildSpeed": 0.25,
+    "craftingQuality": 0.15,
+    "repairEfficiency": 0.2
+  }
+}

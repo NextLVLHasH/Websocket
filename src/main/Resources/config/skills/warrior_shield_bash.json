@@ -1,0 +1,26 @@
+{
+  "id": "warrior_shield_bash",
+  "display_name": "Shield Bash",
+  "description": "Bash your target with a shield, stunning them briefly.",
+  "icon_path": "ui/icons/skill_warrior_2.png",
+  "type": "ACTIVE",
+  "target_type": "ENEMY",
+  "required_level": 3,
+  "prerequisite_skills": ["warrior_power_strike"],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 8000,
+  "mana_cost": 15.0,
+  "stamina_cost": 20.0,
+  "cast_time_millis": 0,
+  "range": 2.0,
+  "effect_data": {
+    "damage_multiplier": 0.8,
+    "damage_type": "PHYSICAL",
+    "stun_duration_ms": 1500
+  },
+  "scaling_attributes": {
+    "STRENGTH": 0.8,
+    "CONSTITUTION": 0.5
+  }
+}

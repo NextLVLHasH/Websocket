@@ -1,0 +1,25 @@
+{
+  "id": "builder_repair",
+  "display_name": "Repair",
+  "description": "Repair a damaged structure or item.",
+  "icon_path": "ui/icons/skill_builder_2.png",
+  "type": "ACTIVE",
+  "target_type": "GROUND",
+  "required_level": 3,
+  "prerequisite_skills": ["builder_quick_build"],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 10000,
+  "mana_cost": 30.0,
+  "stamina_cost": 15.0,
+  "cast_time_millis": 2000,
+  "range": 5.0,
+  "effect_data": {
+    "repair_amount": 50.0,
+    "repair_radius": 3.0
+  },
+  "scaling_attributes": {
+    "INTELLIGENCE": 0.5,
+    "WISDOM": 0.3
+  }
+}

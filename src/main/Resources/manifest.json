@@ -9,5 +9,8 @@
         }
     ],
     "Main": "com.NextLVLHasH.Websockets.WebsocketNotificationMod",
-    "IncludesAssetPack": false
+    "IncludesAssetPack": true,
+    "Dependencies": {
+        "Hytale:DamageModule": "*"
+    }
 }

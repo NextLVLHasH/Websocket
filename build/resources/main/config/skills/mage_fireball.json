@@ -1,0 +1,25 @@
+{
+  "id": "mage_fireball",
+  "display_name": "Fireball",
+  "description": "Hurls a ball of fire at the target, dealing fire damage.",
+  "icon_path": "ui/icons/skill_mage_1.png",
+  "type": "ACTIVE",
+  "target_type": "ENEMY",
+  "required_level": 1,
+  "prerequisite_skills": [],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 4000,
+  "mana_cost": 25.0,
+  "stamina_cost": 0.0,
+  "cast_time_millis": 1000,
+  "range": 25.0,
+  "effect_data": {
+    "damage": 30.0,
+    "damage_type": "FIRE",
+    "aoe_radius": 2.0
+  },
+  "scaling_attributes": {
+    "INTELLIGENCE": 1.5
+  }
+}

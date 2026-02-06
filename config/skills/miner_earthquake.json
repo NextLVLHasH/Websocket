@@ -1,0 +1,25 @@
+{
+  "id": "miner_earthquake",
+  "display_name": "Earthquake",
+  "description": "Strike the ground to break nearby blocks instantly.",
+  "icon_path": "ui/icons/skill_miner_2.png",
+  "type": "ACTIVE",
+  "target_type": "GROUND",
+  "required_level": 5,
+  "prerequisite_skills": ["miner_prospecting"],
+  "skill_point_cost": 2,
+  "required_permissions": [],
+  "cooldown_millis": 45000,
+  "mana_cost": 40.0,
+  "stamina_cost": 30.0,
+  "cast_time_millis": 1000,
+  "range": 0.0,
+  "effect_data": {
+    "break_radius": 3.0,
+    "break_depth": 2,
+    "drops_items": true
+  },
+  "scaling_attributes": {
+    "STRENGTH": 0.8
+  }
+}

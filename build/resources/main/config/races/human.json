@@ -1,0 +1,28 @@
+{
+  "id": "human",
+  "display_name": "Human",
+  "description": "Versatile and adaptable, humans are known for their balanced abilities and quick learning.",
+  "icon_path": "ui/icons/race_human.png",
+  "model_path": "models/races/human.model",
+  "racial_bonuses": {
+    "STRENGTH": 1,
+    "DEXTERITY": 1,
+    "CONSTITUTION": 1,
+    "INTELLIGENCE": 1,
+    "WISDOM": 1,
+    "CHARISMA": 1
+  },
+  "racial_abilities": ["human_adaptability"],
+  "height_scale": 1.0,
+  "speed_modifier": 1.0,
+  "resistances": {},
+  "passive_effects": [
+    {
+      "id": "human_versatility",
+      "name": "Human Versatility",
+      "description": "Gain 10% bonus XP from all sources.",
+      "effect_type": "XP_BONUS",
+      "value": 0.10
+    }
+  ]
+}

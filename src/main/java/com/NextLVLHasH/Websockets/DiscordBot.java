@@ -19,11 +19,19 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.components.buttons.ButtonStyle;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
 import net.dv8tion.jda.api.EmbedBuilder;
 
 import java.awt.Color;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.ArrayList;
@@ -31,6 +39,11 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
+
+import com.NextLVLHasH.Websockets.rpg.bridge.RPGDiscordBridge;
+import com.NextLVLHasH.Websockets.rpg.bridge.RPGDiscordCommands;
+import com.NextLVLHasH.Websockets.rpg.bridge.RPGAdminCommands;
+import com.NextLVLHasH.Websockets.rpg.RPGManager;
 
 /**
  * Discord Bot Manager with full bot capabilities
@@ -60,6 +73,11 @@ public class DiscordBot extends ListenerAdapter {
     private final List<RoleReactionConfig> reactionRoles;
     private String reactionRoleMessageId; // Store message ID for reaction handling
     
+    // Webhook settings for chat messages with avatars
+    private final boolean useChatWebhook;
+    private final String chatWebhookUrl;
+    private MessageFormatter messageFormatter;
+    
     // Emoji -> RoleReactionConfig mapping for quick lookup
     private final Map<String, RoleReactionConfig> emojiToRoleMap = new HashMap<>();
     
@@ -69,18 +87,32 @@ public class DiscordBot extends ListenerAdapter {
     // Callback for chat messages from Discord to Hytale
     private ChatMessageCallback chatCallback;
     
+    // Extended callback with role information
+    private ExtendedChatMessageCallback extendedChatCallback;
+    
     // Verification manager for link verification
     private LinkVerificationManager verificationManager;
     
+    // Statistics manager for player stats
+    private PlayerStatisticsManager statisticsManager;
+    
     // Callback for when a player is verified
     private VerificationCallback verificationCallback;
+    
+    // RPG System integration
+    private RPGDiscordBridge rpgBridge;
+    private RPGDiscordCommands rpgCommands;
+    private RPGAdminCommands rpgAdminCommands;
+    @SuppressWarnings("unused")
+    private RPGManager rpgManager;
     
     public DiscordBot(String botToken, String serverName, String serverAddress, 
                      String serverDescription, String notificationChannelId, 
                      String chatBridgeChannelId, String linkedRoleId,
                      boolean enableReactionRoles, String reactionRoleChannelId,
                      String reactionRoleMessageTitle, String reactionRoleMessageDescription,
-                     List<RoleReactionConfig> reactionRoles) {
+                     List<RoleReactionConfig> reactionRoles,
+                     boolean useChatWebhook, String chatWebhookUrl) {
         this.botToken = botToken;
         this.serverName = serverName;
         this.serverAddress = serverAddress;
@@ -93,6 +125,8 @@ public class DiscordBot extends ListenerAdapter {
         this.reactionRoleMessageTitle = reactionRoleMessageTitle;
         this.reactionRoleMessageDescription = reactionRoleMessageDescription;
         this.reactionRoles = reactionRoles != null ? reactionRoles : List.of();
+        this.useChatWebhook = useChatWebhook;
+        this.chatWebhookUrl = chatWebhookUrl;
         
         // Build emoji -> role mapping and roleId -> config mapping
         for (RoleReactionConfig roleConfig : this.reactionRoles) {
@@ -125,6 +159,9 @@ public class DiscordBot extends ListenerAdapter {
                 jda.awaitReady();
                 LOGGER.info("Discord bot connected successfully!");
                 LOGGER.info("Bot is in " + jda.getGuilds().size() + " guild(s)");
+                
+                // Register slash commands
+                registerSlashCommands();
                 
                 // Setup reaction roles if enabled
                 if (enableReactionRoles) {
@@ -182,6 +219,15 @@ public class DiscordBot extends ListenerAdapter {
             // Always get role prefix from Discord roles (reaction roles)
             String rolePrefix = getPlayerRolePrefix(discordUserId);
             
+            // Get role color for colored display
+            String roleColorHex = getPlayerRoleColor(discordUserId);
+            
+            // Extract role name from prefix (remove brackets if present)
+            String roleName = rolePrefix;
+            if (roleName.startsWith("[") && roleName.endsWith("]")) {
+                roleName = roleName.substring(1, roleName.length() - 1);
+            }
+            
             // Check if user is verified - if so, use their Hytale name
             if (verificationManager != null) {
                 String hytaleUuid = verificationManager.getHytaleUuidByDiscordId(discordUserId);
@@ -194,13 +240,18 @@ public class DiscordBot extends ListenerAdapter {
                 }
             }
             
-            // Format display name with role prefix
+            // Format display name with role prefix (for basic callback)
             String displayName = rolePrefix.isEmpty() ? discordUser : rolePrefix + " " + discordUser;
             
-            LOGGER.info("[Discord -> Hytale] " + displayName + ": " + message);
+            LOGGER.info("[Discord -> Hytale] " + displayName + ": " + message + " (color: " + roleColorHex + ")");
             
-            // Callback to send message to Hytale server
-            if (chatCallback != null) {
+            // Call extended callback first (with role info for colored display)
+            if (extendedChatCallback != null) {
+                extendedChatCallback.onDiscordMessage(discordUser, message, roleName, roleColorHex);
+            }
+            
+            // Call basic callback (for backwards compatibility)
+            if (chatCallback != null && extendedChatCallback == null) {
                 chatCallback.onDiscordMessage(displayName, message);
             }
         }
@@ -224,8 +275,7 @@ public class DiscordBot extends ListenerAdapter {
                 verificationManager.verifyCode(discordUserId, discordUsername, message);
             
             if (result.success) {
-                // Send success message
-                @SuppressWarnings("null")
+
                 EmbedBuilder embed = new EmbedBuilder()
                     .setTitle("✅ Account Linked Successfully!")
                     .setDescription("Your Discord account is now linked to Hytale.")
@@ -515,7 +565,7 @@ public class DiscordBot extends ListenerAdapter {
     /**
      * Update an existing message to use buttons instead of reactions
      */
-    @SuppressWarnings("null")
+
     private void updateMessageWithButtons(net.dv8tion.jda.api.entities.Message message) {
         // Build buttons for roles
         List<Button> buttons = createRoleButtons();
@@ -547,8 +597,6 @@ public class DiscordBot extends ListenerAdapter {
         for (RoleReactionConfig roleConfig : reactionRoles) {
             String buttonId = "role_" + roleConfig.getDiscordRoleId();
             ButtonStyle style = styles[styleIndex % styles.length];
-            
-            @SuppressWarnings("null")
             Button button = Button.of(style, buttonId, roleConfig.getRoleName());
             
             // Add emoji if configured
@@ -571,7 +619,6 @@ public class DiscordBot extends ListenerAdapter {
     /**
      * Create action rows from buttons (max 5 buttons per row)
      */
-    @SuppressWarnings("null")
     private List<ActionRow> createActionRows(List<Button> buttons) {
         List<ActionRow> rows = new ArrayList<>();
         
@@ -586,7 +633,6 @@ public class DiscordBot extends ListenerAdapter {
     /**
      * Create a new role selection message with buttons
      */
-    @SuppressWarnings("null")
     private void createRoleButtonMessage(GuildMessageChannel channel) {
         // Build embed with role descriptions
         EmbedBuilder embed = new EmbedBuilder()
@@ -669,12 +715,10 @@ public class DiscordBot extends ListenerAdapter {
         }
         
         for (Guild guild : jda.getGuilds()) {
-            @SuppressWarnings("null")
             Member member = guild.getMemberById(discordUserId);
             if (member != null) {
                 // Check which reaction roles the member has
                 for (RoleReactionConfig roleConfig : reactionRoles) {
-                    @SuppressWarnings("null")
                     Role role = guild.getRoleById(roleConfig.getDiscordRoleId());
                     if (role != null && member.getRoles().contains(role)) {
                         return roleConfig.getInGamePrefix();
@@ -687,14 +731,66 @@ public class DiscordBot extends ListenerAdapter {
     }
     
     /**
+     * Get player's Discord role color as hex string
+     * @param discordUserId Discord user ID
+     * @return Hex color string (e.g., "#FF5555") or null if no color
+     */
+    public String getPlayerRoleColor(String discordUserId) {
+        if (jda == null || reactionRoles == null || reactionRoles.isEmpty()) {
+            return null;
+        }
+        
+        for (Guild guild : jda.getGuilds()) {
+            Member member = guild.getMemberById(discordUserId);
+            if (member != null) {
+                // Check which reaction roles the member has
+                for (RoleReactionConfig roleConfig : reactionRoles) {
+                    Role role = guild.getRoleById(roleConfig.getDiscordRoleId());
+                    if (role != null && member.getRoles().contains(role)) {
+                        // First check if config has explicit color
+                        if (roleConfig.getRoleColor() != null && !roleConfig.getRoleColor().isEmpty()) {
+                            return roleConfig.getRoleColor();
+                        }
+                        // Fall back to Discord role color
+                        if (role.getColor() != null) {
+                            return MessageFormatter.discordColorToHex(role.getColorRaw());
+                        }
+                    }
+                }
+                
+                // If no reaction role found, try to get color from highest Discord role
+                Color memberColor = member.getColor();
+                if (memberColor != null) {
+                    return String.format("#%02X%02X%02X", 
+                        memberColor.getRed(), memberColor.getGreen(), memberColor.getBlue());
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get role color for a verified player by their Hytale UUID
+     * @param hytaleUuid The Hytale player UUID
+     * @return Hex color string or null
+     */
+    public String getVerifiedPlayerRoleColor(String hytaleUuid) {
+        if (verificationManager == null || jda == null) return null;
+        
+        LinkVerificationManager.VerifiedLink link = verificationManager.getVerifiedLink(hytaleUuid);
+        if (link == null) return null;
+        
+        return getPlayerRoleColor(link.discordUserId);
+    }
+    
+    /**
      * Check if a member has the linked role (required for chat bridge)
      */
     public boolean hasLinkedRole(Member member) {
         if (member == null || linkedRoleId == null || linkedRoleId.isEmpty()) {
             return false;
         }
-        
-        @SuppressWarnings("null")
         Role linkedRole = member.getGuild().getRoleById(linkedRoleId);
         if (linkedRole == null) {
             LOGGER.warning("Linked role not found: " + linkedRoleId);
@@ -713,7 +809,6 @@ public class DiscordBot extends ListenerAdapter {
         }
         
         for (Guild guild : jda.getGuilds()) {
-            @SuppressWarnings("null")
             Member member = guild.getMemberById(discordUserId);
             if (member != null) {
                 return hasLinkedRole(member);
@@ -730,7 +825,6 @@ public class DiscordBot extends ListenerAdapter {
         if (jda == null) return null;
         
         for (Guild guild : jda.getGuilds()) {
-            @SuppressWarnings("null")
             Member member = guild.getMemberById(discordUserId);
             if (member != null) {
                 return member.getEffectiveName();
@@ -743,7 +837,6 @@ public class DiscordBot extends ListenerAdapter {
     /**
      * Send player join notification
      */
-    @SuppressWarnings("null")
     public void sendPlayerJoinNotification(String playerName, int totalPlayers) {
         GuildMessageChannel channel = getNotificationChannel();
         if (channel == null) return;     
@@ -770,7 +863,6 @@ public class DiscordBot extends ListenerAdapter {
     /**
      * Send player leave notification
      */
-    @SuppressWarnings("null")
     public void sendPlayerLeaveNotification(String playerName, int totalPlayers) {
         GuildMessageChannel channel = getNotificationChannel();
         if (channel == null) return;
@@ -798,7 +890,6 @@ public class DiscordBot extends ListenerAdapter {
     /**
      * Send server start notification
      */
-    @SuppressWarnings("null")
     public void sendServerStartNotification(int totalPlayers) {
         GuildMessageChannel channel = getNotificationChannel();
         if (channel == null) return;
@@ -828,8 +919,7 @@ public class DiscordBot extends ListenerAdapter {
     public void sendServerStopNotification(int totalPlayers) {
         GuildMessageChannel channel = getNotificationChannel();
         if (channel == null) return;
-        
-        @SuppressWarnings("null")
+       
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle("🔴 Server Stopped")
                 .setDescription("**" + serverName + "** is now offline.")
@@ -845,10 +935,35 @@ public class DiscordBot extends ListenerAdapter {
     }
     
     /**
-     * Send Hytale chat message to Discord
+     * Set the message formatter for customizable formatting
      */
-    @SuppressWarnings("null")
+    public void setMessageFormatter(MessageFormatter formatter) {
+        this.messageFormatter = formatter;
+    }
+    
+    /**
+     * Send Hytale chat message to Discord
+     * Supports both regular bot messages and webhook messages with player avatars
+     */
     public void sendHytaleChatToDiscord(String playerName, String message) {
+        sendHytaleChatToDiscord(playerName, null, message);
+    }
+    
+    /**
+     * Send Hytale chat message to Discord with player UUID for avatar support
+     * @param playerName Player's display name
+     * @param playerUuid Player's UUID (for avatar URL)
+     * @param message The chat message
+     */
+
+    public void sendHytaleChatToDiscord(String playerName, String playerUuid, String message) {
+        // Use webhook if configured
+        if (useChatWebhook && chatWebhookUrl != null && !chatWebhookUrl.isEmpty()) {
+            sendChatViaWebhook(playerName, playerUuid, message);
+            return;
+        }
+        
+        // Fall back to regular bot message
         if (chatBridgeChannelId == null || chatBridgeChannelId.isEmpty()) {
             LOGGER.warning("Chat bridge channel ID not configured");
             return;
@@ -867,7 +982,14 @@ public class DiscordBot extends ListenerAdapter {
             return;
         }
         
-        String formattedMessage = "**[Hytale]** `" + playerName + "`: " + message;
+        // Use message formatter if available
+        String formattedMessage;
+        if (messageFormatter != null) {
+            formattedMessage = messageFormatter.formatHytaleToDiscord(playerName, message);
+        } else {
+            formattedMessage = "**[Hytale]** `" + playerName + "`: " + message;
+        }
+        
         channel.sendMessage(formattedMessage).queue(
             success -> LOGGER.info("Chat message sent to Discord: " + playerName + ": " + message),
             error -> LOGGER.warning("Failed to send chat to Discord: " + error.getMessage())
@@ -875,9 +997,71 @@ public class DiscordBot extends ListenerAdapter {
     }
     
     /**
+     * Send chat message via Discord webhook with player avatar
+     */
+    private void sendChatViaWebhook(String playerName, String playerUuid, String message) {
+        try {
+            // Build avatar URL
+            String avatarUrl = null;
+            if (messageFormatter != null && playerUuid != null) {
+                avatarUrl = messageFormatter.getPlayerAvatarUrl(playerUuid, playerName);
+            }
+            
+            // Build webhook JSON payload
+            StringBuilder json = new StringBuilder();
+            json.append("{");
+            json.append("\"username\":\"").append(escapeJson(playerName)).append("\",");
+            if (avatarUrl != null && !avatarUrl.isEmpty()) {
+                json.append("\"avatar_url\":\"").append(escapeJson(avatarUrl)).append("\",");
+            }
+            json.append("\"content\":\"").append(escapeJson(message)).append("\"");
+            json.append("}");
+            
+            // Send webhook request
+            HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+                
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(chatWebhookUrl))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json.toString()))
+                .build();
+            
+            httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenAccept(response -> {
+                    if (response.statusCode() == 204 || response.statusCode() == 200) {
+                        LOGGER.info("Chat webhook sent: " + playerName + ": " + message);
+                    } else {
+                        LOGGER.warning("Chat webhook failed with status: " + response.statusCode());
+                    }
+                })
+                .exceptionally(error -> {
+                    LOGGER.warning("Failed to send chat webhook: " + error.getMessage());
+                    return null;
+                });
+                
+        } catch (Exception e) {
+            LOGGER.warning("Error sending chat webhook: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Escape special characters for JSON
+     */
+    private String escapeJson(String text) {
+        if (text == null) return "";
+        return text
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t");
+    }
+    
+    /**
      * Assign role to Discord user by Discord ID
      */
-    @SuppressWarnings({ "null" })
     public void assignRole(String discordUserId, String roleName) {
         if (jda == null) return;
         
@@ -900,7 +1084,6 @@ public class DiscordBot extends ListenerAdapter {
     /**
      * Remove role from Discord user
      */
-    @SuppressWarnings({"null"})
     public void removeRole(String discordUserId, String roleName) {
         if (jda == null) return;
         
@@ -927,9 +1110,7 @@ public class DiscordBot extends ListenerAdapter {
         if (jda == null) return;
         
         jda.getGuilds().forEach(guild -> {
-            @SuppressWarnings("null")
             Member member = guild.getMemberById(discordUserId);
-            @SuppressWarnings("null")
             Role role = guild.getRoleById(linkedRoleId);
             
             if (member != null && role != null) {
@@ -942,10 +1123,17 @@ public class DiscordBot extends ListenerAdapter {
     }
     
     /**
-     * Set callback for Discord messages
+     * Set callback for Discord messages (basic, without role info)
      */
     public void setChatCallback(ChatMessageCallback callback) {
         this.chatCallback = callback;
+    }
+    
+    /**
+     * Set extended callback for Discord messages (with role info for colored display)
+     */
+    public void setExtendedChatCallback(ExtendedChatMessageCallback callback) {
+        this.extendedChatCallback = callback;
     }
     
     /**
@@ -967,13 +1155,13 @@ public class DiscordBot extends ListenerAdapter {
      * @param discordUsername The Discord username to find
      * @param hytaleName The Hytale player name linking
      * @param authCode The auth code to verify with
+     * @return 
      */
-    public void sendLinkRequestDM(String discordUsername, String hytaleName, String authCode) {
-        if (jda == null) return;
+    public boolean sendLinkRequestDM(String discordUsername, String hytaleName, String authCode) {
+        if (jda == null) return false;
         
         // Find user in guilds
         for (Guild guild : jda.getGuilds()) {
-            @SuppressWarnings("null")
             List<Member> members = guild.getMembersByName(discordUsername, true);
             if (!members.isEmpty()) {
                 Member member = members.get(0);
@@ -984,7 +1172,6 @@ public class DiscordBot extends ListenerAdapter {
                     verificationManager.updatePendingDiscordUserId(authCode, user.getId());
                 }
                 
-                @SuppressWarnings("null")
                 EmbedBuilder embed = new EmbedBuilder()
                     .setTitle("🔗 Hytale Account Link Request")
                     .setColor(Color.ORANGE)
@@ -1005,11 +1192,12 @@ public class DiscordBot extends ListenerAdapter {
                     error -> LOGGER.warning("Failed to open DM channel: " + error.getMessage())
                 );
                 
-                return;
+                return true;
             }
         }
         
         LOGGER.info("Could not find Discord user: " + discordUsername + " - they may need to DM the bot first");
+        return false;
     }
     
     /**
@@ -1041,9 +1229,32 @@ public class DiscordBot extends ListenerAdapter {
     }
     
     /**
+     * Get Discord server nickname (or username if no nickname) for a verified player
+     * @param hytaleUuid The Hytale player UUID
+     * @return Discord effective name (nickname if set, otherwise username) or null
+     */
+    public String getVerifiedPlayerDiscordNickname(String hytaleUuid) {
+        if (verificationManager == null || jda == null) return null;
+        
+        LinkVerificationManager.VerifiedLink link = verificationManager.getVerifiedLink(hytaleUuid);
+        if (link == null) return null;
+        
+        // Try to find the member in guilds to get their effective name (nickname)
+        for (Guild guild : jda.getGuilds()) {
+            Member member = guild.getMemberById(link.discordUserId);
+            if (member != null) {
+                // getEffectiveName() returns nickname if set, otherwise username
+                return member.getEffectiveName();
+            }
+        }
+        
+        // Fallback to stored username if member not found
+        return link.discordUsername;
+    }
+    
+    /**
      * Get notification channel (supports both TextChannel and NewsChannel/Announcement channels)
      */
-    @SuppressWarnings("null")
     private GuildMessageChannel getNotificationChannel() {
         if (jda == null) {
             LOGGER.warning("Cannot get notification channel - JDA not initialized");
@@ -1097,11 +1308,26 @@ public class DiscordBot extends ListenerAdapter {
     }
     
     /**
-     * Callback interface for Discord chat messages
+     * Callback interface for Discord chat messages (basic)
      */
     @FunctionalInterface
     public interface ChatMessageCallback {
         void onDiscordMessage(String discordUser, String message);
+    }
+    
+    /**
+     * Extended callback interface for Discord chat messages with role information
+     */
+    @FunctionalInterface
+    public interface ExtendedChatMessageCallback {
+        /**
+         * Called when a Discord message is received
+         * @param discordUser The Discord username or Hytale name (for verified users)
+         * @param message The message content
+         * @param roleName The top role name (e.g., "Knight") or empty string
+         * @param roleColorHex The role color as hex (e.g., "#FF5555") or null
+         */
+        void onDiscordMessage(String discordUser, String message, String roleName, String roleColorHex);
     }
     
     /**
@@ -1110,5 +1336,239 @@ public class DiscordBot extends ListenerAdapter {
     @FunctionalInterface
     public interface VerificationCallback {
         void onVerified(String hytaleUuid, String discordUserId, String discordUsername);
+    }
+    
+    /**
+     * Set the statistics manager for player stats lookup
+     */
+    public void setStatisticsManager(PlayerStatisticsManager statisticsManager) {
+        this.statisticsManager = statisticsManager;
+    }
+    
+    /**
+     * Set the RPG manager for RPG system integration
+     */
+    public void setRPGManager(RPGManager rpgManager) {
+        this.rpgManager = rpgManager;
+        if (rpgManager != null) {
+            // Initialize RPG Discord components
+            this.rpgBridge = new RPGDiscordBridge();
+            this.rpgCommands = new RPGDiscordCommands(rpgManager);
+            this.rpgAdminCommands = new RPGAdminCommands(rpgManager);
+            
+            if (verificationManager != null) {
+                rpgCommands.setVerificationManager(verificationManager);
+                rpgAdminCommands.setVerificationManager(verificationManager);
+            }
+            
+            // Initialize bridge with JDA when bot is ready
+            if (jda != null) {
+                initializeRPGBridge();
+            }
+        }
+    }
+    
+    /**
+     * Get the RPG Discord bridge for event notifications
+     */
+    public RPGDiscordBridge getRPGBridge() {
+        return rpgBridge;
+    }
+    
+    /**
+     * Initialize RPG bridge with Discord channels
+     */
+    private void initializeRPGBridge() {
+        if (rpgBridge != null && jda != null) {
+            // Use notification channel for RPG events (can be configured separately)
+            rpgBridge.initialize(jda, notificationChannelId, notificationChannelId, notificationChannelId);
+            LOGGER.info("RPG Discord bridge initialized");
+        }
+    }
+    
+    /**
+     * Register slash commands
+     */
+    private void registerSlashCommands() {
+        LOGGER.info("Registering slash commands...");
+        
+        // Clear any old global commands (they take up to 1 hour to disappear)
+        jda.updateCommands().queue(
+            success -> LOGGER.info("Cleared global commands"),
+            failure -> LOGGER.warning("Failed to clear global commands: " + failure.getMessage())
+        );
+        
+        // Register commands to each guild (instant update) instead of global (up to 1 hour delay)
+        for (Guild guild : jda.getGuilds()) {
+            var commandUpdate = guild.updateCommands()
+                .addCommands(
+                    Commands.slash("stats", "View player statistics")
+                        .addOption(OptionType.STRING, "player", "Player name (Discord or in-game)", false)
+                );
+            
+            // Add RPG commands if RPG system is enabled
+            if (rpgCommands != null) {
+                commandUpdate.addCommands(rpgCommands.getCommandDefinitions());
+                LOGGER.info("Adding RPG slash commands");
+            }
+            
+            // Add RPG admin commands if RPG system is enabled
+            if (rpgAdminCommands != null) {
+                commandUpdate.addCommands(rpgAdminCommands.getCommandDefinitions());
+                LOGGER.info("Adding RPG admin slash commands");
+            }
+            
+            commandUpdate.queue(
+                    success -> LOGGER.info("Slash commands registered for guild: " + guild.getName()),
+                    failure -> LOGGER.severe("Failed to register slash commands for " + guild.getName() + ": " + failure.getMessage())
+                );
+        }
+        
+        LOGGER.info("Slash command registration queued for " + jda.getGuilds().size() + " guild(s)");
+    }
+    
+    /**
+     * Handle slash command interactions
+     */
+    @Override
+    public void onSlashCommandInteraction(@SuppressWarnings("null") SlashCommandInteractionEvent event) {
+        String commandName = event.getName();
+        
+        if ("stats".equals(commandName)) {
+            handleStatsCommand(event);
+        } else if ("rpg".equals(commandName)) {
+            if (rpgCommands != null) {
+                rpgCommands.handleCommand(event);
+            } else {
+                event.reply("❌ RPG system is not enabled on this server.").setEphemeral(true).queue();
+            }
+        } else if ("rpgadmin".equals(commandName)) {
+            if (rpgAdminCommands != null) {
+                rpgAdminCommands.handleCommand(event);
+            } else {
+                event.reply("❌ RPG system is not enabled on this server.").setEphemeral(true).queue();
+            }
+        }
+    }
+    
+    /**
+     * Handle the /stats slash command
+     */
+    private void handleStatsCommand(SlashCommandInteractionEvent event) {
+        // Defer reply to give us time to fetch data
+        event.deferReply().queue();
+        
+        if (statisticsManager == null) {
+            event.getHook().sendMessage("❌ Statistics tracking is not enabled on this server.").queue();
+            return;
+        }
+        
+        @SuppressWarnings("null")
+        String playerOption = event.getOption("player") != null 
+            ? event.getOption("player").getAsString() 
+            : null;
+        
+        PlayerStatistics stats = null;
+        String targetName = null;
+        
+        if (playerOption == null || playerOption.isEmpty()) {
+            // No player specified - try to find stats for the Discord user
+            String discordUserId = event.getUser().getId();
+            
+            // Check if this Discord user is linked to a Hytale account
+            if (verificationManager != null) {
+                String hytaleUuid = verificationManager.getHytaleUuidByDiscordId(discordUserId);
+                if (hytaleUuid != null) {
+                    stats = statisticsManager.getStats(hytaleUuid);
+                    if (stats != null) {
+                        targetName = stats.getPlayerName();
+                    }
+                }
+            }
+            
+            if (stats == null) {
+                event.getHook().sendMessageEmbeds(
+                    new EmbedBuilder()
+                        .setTitle("❌ No Linked Account")
+                        .setDescription("You don't have a linked Hytale account.\n\n" +
+                            "**Options:**\n" +
+                            "• Link your account with `/link` in-game\n" +
+                            "• Specify a player name: `/stats player:Name`")
+                        .setColor(Color.RED)
+                        .build()
+                ).queue();
+                return;
+            }
+        } else {
+            // Player name specified - search by name
+            targetName = playerOption;
+            
+            // First try to find by in-game name
+            for (PlayerStatistics s : statisticsManager.getAllStats().values()) {
+                if (s.getPlayerName().equalsIgnoreCase(playerOption)) {
+                    stats = s;
+                    break;
+                }
+            }
+            
+            // If not found, try to find by Discord username (for linked accounts)
+            if (stats == null && verificationManager != null) {
+                for (Map.Entry<String, PlayerStatistics> entry : statisticsManager.getAllStats().entrySet()) {
+                    String uuid = entry.getKey();
+                    LinkVerificationManager.VerifiedLink link = verificationManager.getVerifiedLink(uuid);
+                    if (link != null && link.discordUsername.equalsIgnoreCase(playerOption)) {
+                        stats = entry.getValue();
+                        targetName = stats.getPlayerName();
+                        break;
+                    }
+                }
+            }
+            
+            if (stats == null) {
+                event.getHook().sendMessageEmbeds(
+                    new EmbedBuilder()
+                        .setTitle("❌ Player Not Found")
+                        .setDescription("No statistics found for player: **" + playerOption + "**\n\n" +
+                            "The player may not have joined the server yet.")
+                        .setColor(Color.RED)
+                        .build()
+                ).queue();
+                return;
+            }
+        }
+        
+        // Build stats embed
+        int playtimeRank = statisticsManager.getPlaytimeRank(stats.getPlayerUuid());
+        String rankStr = playtimeRank > 0 ? " (#" + playtimeRank + ")" : "";
+        
+        String sessionInfo = stats.isInSession() 
+            ? "🟢 Online (" + stats.getFormattedSessionTime() + ")"
+            : "⚫ Offline";
+        
+        EmbedBuilder embed = new EmbedBuilder()
+            .setTitle("📊 Player Statistics: " + targetName)
+            .setColor(Color.decode("#5865F2"))
+            .addField("⏱️ Playtime", stats.getFormattedPlaytime() + rankStr, true)
+            .addField("🔄 Sessions", String.valueOf(stats.getTotalSessions()), true)
+            .addField("📡 Status", sessionInfo, true)
+            .addField("⛏️ Blocks Broken", String.valueOf(stats.getBlocksBroken()), true)
+            .addField("⚔️ Mobs Killed", String.valueOf(stats.getMobsKilled()), true)
+            .addField("💬 Messages", String.valueOf(stats.getMessagesSent()), true)
+            .setFooter("First seen: " + formatTimestamp(stats.getFirstSeenTimestamp()))
+            .setTimestamp(Instant.now());
+        
+        event.getHook().sendMessageEmbeds(embed.build()).queue();
+    }
+    
+    /**
+     * Format a Unix timestamp to a readable date string
+     */
+    private String formatTimestamp(long epochSeconds) {
+        if (epochSeconds == 0) return "Unknown";
+        java.time.LocalDateTime dateTime = java.time.LocalDateTime.ofInstant(
+            Instant.ofEpochSecond(epochSeconds), 
+            java.time.ZoneId.systemDefault()
+        );
+        return dateTime.format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy"));
     }
 }

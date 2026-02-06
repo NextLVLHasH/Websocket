@@ -1,0 +1,14 @@
+{
+  "id": "herbalist",
+  "display_name": "Herbalist",
+  "description": "Skilled gatherers who specialize in finding and cultivating plants and herbs.",
+  "icon_path": "ui/icons/prof_herbalist.png",
+  "allowed_classes": [],
+  "resource_bonuses": {
+    "herb": 25,
+    "flower": 20,
+    "seed": 15,
+    "vegetable": 10
+  },
+  "max_level": 100
+}

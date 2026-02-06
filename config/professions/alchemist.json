@@ -1,0 +1,14 @@
+{
+  "id": "alchemist",
+  "display_name": "Alchemist",
+  "description": "Potion brewers who combine ingredients to create powerful elixirs and bombs.",
+  "icon_path": "ui/icons/prof_alchemist.png",
+  "allowed_classes": [],
+  "resource_bonuses": {
+    "herb": 10,
+    "crystal": 15,
+    "essence": 20,
+    "reagent": 25
+  },
+  "max_level": 100
+}

@@ -1,0 +1,38 @@
+{
+  "id": "dwarf",
+  "display_name": "Dwarf",
+  "description": "Stout and hardy, dwarves are renowned for their resilience, craftsmanship, and mining expertise.",
+  "icon_path": "ui/icons/race_dwarf.png",
+  "model_path": "models/races/dwarf.model",
+  "racial_bonuses": {
+    "STRENGTH": 2,
+    "DEXTERITY": -1,
+    "CONSTITUTION": 3,
+    "INTELLIGENCE": 0,
+    "WISDOM": 1,
+    "CHARISMA": -1
+  },
+  "racial_abilities": ["stonecunning", "dwarven_resilience"],
+  "height_scale": 0.85,
+  "speed_modifier": 0.95,
+  "resistances": {
+    "poison": 0.25,
+    "physical": 0.05
+  },
+  "passive_effects": [
+    {
+      "id": "dwarven_toughness",
+      "name": "Dwarven Toughness",
+      "description": "Maximum health increased by 10%.",
+      "effect_type": "MAX_HEALTH",
+      "value": 0.10
+    },
+    {
+      "id": "master_craftsman",
+      "name": "Master Craftsman",
+      "description": "Gain 15% bonus to crafting and mining efficiency.",
+      "effect_type": "CRAFTING_BONUS",
+      "value": 0.15
+    }
+  ]
+}

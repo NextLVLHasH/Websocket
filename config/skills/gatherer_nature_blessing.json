@@ -1,0 +1,26 @@
+{
+  "id": "gatherer_nature_blessing",
+  "display_name": "Nature's Blessing",
+  "description": "Bless an area to accelerate crop growth.",
+  "icon_path": "ui/icons/skill_gatherer_2.png",
+  "type": "ACTIVE",
+  "target_type": "GROUND",
+  "required_level": 3,
+  "prerequisite_skills": ["gatherer_harvest_touch"],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 120000,
+  "mana_cost": 50.0,
+  "stamina_cost": 10.0,
+  "cast_time_millis": 3000,
+  "range": 10.0,
+  "effect_data": {
+    "growth_speed_multiplier": 2.0,
+    "effect_radius": 8.0,
+    "duration_ms": 60000
+  },
+  "scaling_attributes": {
+    "WISDOM": 0.5,
+    "INTELLIGENCE": 0.3
+  }
+}

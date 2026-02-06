@@ -1,0 +1,74 @@
+{
+  "id": "gatherer_harvest_tree",
+  "display_name": "Nature's Bounty",
+  "associated_class": "gatherer",
+  "description": "A skill tree focusing on farming and gathering.",
+  "icon_path": "ui/icons/tree_gatherer.png",
+  "root_skill_id": "gatherer_harvest_touch",
+  "nodes": {
+    "gatherer_harvest_touch": {
+      "skill": {
+        "id": "gatherer_harvest_touch",
+        "display_name": "Harvest Touch",
+        "description": "Instantly harvest a fully grown crop with bonus yield.",
+        "icon_path": "ui/icons/skill_gatherer_1.png",
+        "type": "ACTIVE",
+        "target_type": "GROUND",
+        "required_level": 1,
+        "prerequisite_skills": [],
+        "skill_point_cost": 1,
+        "cooldown_millis": 5000,
+        "mana_cost": 10.0,
+        "stamina_cost": 5.0,
+        "cast_time_millis": 0,
+        "range": 4.0,
+        "effect_data": {
+          "yield_bonus": 0.25,
+          "auto_replant": true
+        },
+        "scaling_attributes": {
+          "WISDOM": 0.3
+        }
+      },
+      "tier": 0,
+      "position": 0,
+      "x": 100,
+      "y": 50,
+      "child_nodes": ["gatherer_nature_blessing"],
+      "parent_nodes": []
+    },
+    "gatherer_nature_blessing": {
+      "skill": {
+        "id": "gatherer_nature_blessing",
+        "display_name": "Nature's Blessing",
+        "description": "Bless an area to accelerate crop growth.",
+        "icon_path": "ui/icons/skill_gatherer_2.png",
+        "type": "ACTIVE",
+        "target_type": "GROUND",
+        "required_level": 3,
+        "prerequisite_skills": ["gatherer_harvest_touch"],
+        "skill_point_cost": 1,
+        "cooldown_millis": 120000,
+        "mana_cost": 50.0,
+        "stamina_cost": 10.0,
+        "cast_time_millis": 3000,
+        "range": 10.0,
+        "effect_data": {
+          "growth_speed_multiplier": 2.0,
+          "effect_radius": 8.0,
+          "duration_ms": 60000
+        },
+        "scaling_attributes": {
+          "WISDOM": 0.5,
+          "INTELLIGENCE": 0.3
+        }
+      },
+      "tier": 1,
+      "position": 0,
+      "x": 100,
+      "y": 150,
+      "child_nodes": [],
+      "parent_nodes": ["gatherer_harvest_touch"]
+    }
+  }
+}

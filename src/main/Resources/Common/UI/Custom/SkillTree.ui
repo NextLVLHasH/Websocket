@@ -1,0 +1,859 @@
+// Skill Tree UI
+// Displays the skill tree with nodes, details panel, and unlock functionality
+
+// ==================== Style Definitions ====================
+
+@TitleStyle = LabelStyle(
+    FontSize: 22,
+    TextColor: #FFD700,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@SubtitleStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #AAAAAA,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@SkillPointsStyle = LabelStyle(
+    FontSize: 16,
+    TextColor: #FF55FF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+// Skill node states
+@UnlockedSkillStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #55FF55,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@AvailableSkillStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FFFF55,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@LockedSkillStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #888888,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@SelectedSkillStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+// Details panel styles
+@DetailsTitleStyle = LabelStyle(
+    FontSize: 18,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@DetailsDescStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #CCCCCC,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Start
+);
+
+@DetailsLabelStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #AAAAAA,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+@DetailsValueStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@TypeActiveStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FF5555,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@TypePassiveStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #55FF55,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@TypeToggleStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #55FFFF,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@TypeUltimateStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #FF55FF,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@RequirementMetStyle = LabelStyle(
+    FontSize: 11,
+    TextColor: #55FF55,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+@RequirementUnmetStyle = LabelStyle(
+    FontSize: 11,
+    TextColor: #FF5555,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+@ButtonTextStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@ButtonDisabledStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #666666,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@CloseButtonStyle = LabelStyle(
+    FontSize: 16,
+    TextColor: #FF5555,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+// ==================== Main Layout ====================
+
+Group {
+    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+    LayoutMode: Center;
+
+    // Main container
+    Group #MainContainer {
+        Anchor: (Width: 700, Height: 500);
+        Background: #1a1a2e(0.95);
+
+        // Top border decoration
+        Group #TopBorder {
+            Anchor: (Top: 0, Left: 0, Right: 0, Height: 3);
+            Background: #FFD700;
+        }
+
+        // Bottom border decoration
+        Group #BottomBorder {
+            Anchor: (Bottom: 0, Left: 0, Right: 0, Height: 3);
+            Background: #FFD700;
+        }
+
+        // Header section
+        Group #HeaderSection {
+            Anchor: (Top: 8, Left: 16, Right: 16, Height: 60);
+
+            // Close button
+            Button #CloseButton {
+                Anchor: (Top: 0, Right: 0, Width: 32, Height: 32);
+                Background: #442222;
+
+                Label #CloseButtonText {
+                    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                    Style: @CloseButtonStyle;
+                    Text: "X";
+                }
+            }
+
+            // Tree title
+            Label #TreeTitle {
+                Anchor: (Top: 4, Left: 0, Right: 40, Height: 28);
+                Style: @TitleStyle;
+                Text: "Skill Tree";
+            }
+
+            // Available skill points
+            Group #SkillPointsContainer {
+                Anchor: (Top: 36, Left: 0, Right: 0, Height: 20);
+
+                Label #SkillPointsLabel {
+                    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                    Style: @SkillPointsStyle;
+                    Text: "Available Skill Points: 0";
+                }
+            }
+        }
+
+        // Separator
+        Group #HeaderSeparator {
+            Anchor: (Top: 72, Left: 16, Right: 16, Height: 1);
+            Background: #444444;
+        }
+
+        // Content area (skill grid + details panel)
+        Group #ContentArea {
+            Anchor: (Top: 80, Left: 16, Right: 16, Bottom: 16);
+
+            // ==================== Skill Grid Panel (Left) ====================
+            Group #SkillGridPanel {
+                Anchor: (Top: 0, Left: 0, Width: 400, Bottom: 0);
+                Background: #0d0d1a(0.5);
+
+                // Grid header
+                Label #GridHeader {
+                    Anchor: (Top: 8, Left: 8, Right: 8, Height: 20);
+                    Style: @SubtitleStyle;
+                    Text: "Skills";
+                }
+
+                // Scrollable skill node container
+                Group #SkillNodesContainer {
+                    Anchor: (Top: 36, Left: 8, Right: 8, Bottom: 8);
+
+                    // Tier 0 row
+                    Group #Tier0 {
+                        Anchor: (Top: 0, Left: 0, Right: 0, Height: 60);
+
+                        // Skill nodes will be populated dynamically
+                        // Template skill node
+                        Button #SkillNodeR0C0 {
+                            Anchor: (Top: 4, Left: 4, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR0C0 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR0C0 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR0C1 {
+                            Anchor: (Top: 4, Left: 60, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR0C1 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR0C1 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR0C2 {
+                            Anchor: (Top: 4, Left: 116, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR0C2 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR0C2 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR0C3 {
+                            Anchor: (Top: 4, Left: 172, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR0C3 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR0C3 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR0C4 {
+                            Anchor: (Top: 4, Left: 228, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR0C4 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR0C4 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+                    }
+
+                    // Tier 1 row
+                    Group #Tier1 {
+                        Anchor: (Top: 64, Left: 0, Right: 0, Height: 60);
+
+                        Button #SkillNodeR1C0 {
+                            Anchor: (Top: 4, Left: 4, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR1C0 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR1C0 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR1C1 {
+                            Anchor: (Top: 4, Left: 60, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR1C1 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR1C1 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR1C2 {
+                            Anchor: (Top: 4, Left: 116, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR1C2 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR1C2 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR1C3 {
+                            Anchor: (Top: 4, Left: 172, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR1C3 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR1C3 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR1C4 {
+                            Anchor: (Top: 4, Left: 228, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR1C4 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR1C4 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+                    }
+
+                    // Tier 2 row
+                    Group #Tier2 {
+                        Anchor: (Top: 128, Left: 0, Right: 0, Height: 60);
+
+                        Button #SkillNodeR2C0 {
+                            Anchor: (Top: 4, Left: 4, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR2C0 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR2C0 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR2C1 {
+                            Anchor: (Top: 4, Left: 60, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR2C1 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR2C1 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR2C2 {
+                            Anchor: (Top: 4, Left: 116, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR2C2 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR2C2 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR2C3 {
+                            Anchor: (Top: 4, Left: 172, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR2C3 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR2C3 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR2C4 {
+                            Anchor: (Top: 4, Left: 228, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR2C4 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR2C4 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+                    }
+
+                    // Tier 3 row
+                    Group #Tier3 {
+                        Anchor: (Top: 192, Left: 0, Right: 0, Height: 60);
+
+                        Button #SkillNodeR3C0 {
+                            Anchor: (Top: 4, Left: 4, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR3C0 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR3C0 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR3C1 {
+                            Anchor: (Top: 4, Left: 60, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR3C1 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR3C1 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR3C2 {
+                            Anchor: (Top: 4, Left: 116, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR3C2 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR3C2 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR3C3 {
+                            Anchor: (Top: 4, Left: 172, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR3C3 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR3C3 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR3C4 {
+                            Anchor: (Top: 4, Left: 228, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR3C4 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR3C4 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+                    }
+
+                    // Tier 4 row
+                    Group #Tier4 {
+                        Anchor: (Top: 256, Left: 0, Right: 0, Height: 60);
+
+                        Button #SkillNodeR4C0 {
+                            Anchor: (Top: 4, Left: 4, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR4C0 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR4C0 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR4C1 {
+                            Anchor: (Top: 4, Left: 60, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR4C1 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR4C1 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR4C2 {
+                            Anchor: (Top: 4, Left: 116, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR4C2 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR4C2 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR4C3 {
+                            Anchor: (Top: 4, Left: 172, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR4C3 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR4C3 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+
+                        Button #SkillNodeR4C4 {
+                            Anchor: (Top: 4, Left: 228, Width: 52, Height: 52);
+                            Background: #333344;
+
+                            Group #SkillIconR4C4 {
+                                Anchor: (Top: 4, Left: 4, Right: 4, Height: 28);
+                                Background: #555566;
+                            }
+
+                            Label #SkillNameR4C4 {
+                                Anchor: (Bottom: 2, Left: 2, Right: 2, Height: 16);
+                                Style: @LockedSkillStyle;
+                                Text: "";
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ==================== Details Panel (Right) ====================
+            Group #DetailsPanel {
+                Anchor: (Top: 0, Right: 0, Width: 256, Bottom: 0);
+                Background: #0d0d1a(0.5);
+
+                // No skill selected message
+                Label #NoSelectionMessage {
+                    Anchor: (Left: 8, Top: 8, Right: 8, Bottom: 8);
+                    Style: @SubtitleStyle;
+                    Text: "Select a skill to view details";
+                }
+
+                // Skill details container (shown when a skill is selected)
+                Group #SkillDetailsContainer {
+                    Anchor: (Left: 8, Top: 8, Right: 8, Bottom: 8);
+                    Visible: false;
+
+                    // Skill name
+                    Label #SelectedSkillName {
+                        Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
+                        Style: @DetailsTitleStyle;
+                        Text: "Skill Name";
+                    }
+
+                    // Skill type
+                    Group #SkillTypeRow {
+                        Anchor: (Top: 28, Left: 0, Right: 0, Height: 18);
+
+                        Label #TypeLabel {
+                            Anchor: (Left: 0, Top: 0, Width: 60, Bottom: 0);
+                            Style: @DetailsLabelStyle;
+                            Text: "Type:";
+                        }
+
+                        Label #SkillType {
+                            Anchor: (Right: 0, Top: 0, Width: 100, Bottom: 0);
+                            Style: @TypeActiveStyle;
+                            Text: "Active";
+                        }
+                    }
+
+                    // Separator
+                    Group #DetailsSeparator1 {
+                        Anchor: (Top: 50, Left: 0, Right: 0, Height: 1);
+                        Background: #333344;
+                    }
+
+                    // Description
+                    Label #SkillDescription {
+                        Anchor: (Top: 56, Left: 0, Right: 0, Height: 48);
+                        Style: @DetailsDescStyle;
+                        Text: "Skill description goes here...";
+                    }
+
+                    // Separator
+                    Group #DetailsSeparator2 {
+                        Anchor: (Top: 108, Left: 0, Right: 0, Height: 1);
+                        Background: #333344;
+                    }
+
+                    // Requirements section
+                    Label #RequirementsHeader {
+                        Anchor: (Top: 114, Left: 0, Right: 0, Height: 18);
+                        Style: @DetailsLabelStyle;
+                        Text: "Requirements:";
+                    }
+
+                    // Level requirement
+                    Label #LevelRequirement {
+                        Anchor: (Top: 134, Left: 8, Right: 0, Height: 16);
+                        Style: @RequirementMetStyle;
+                        Text: "Level 1";
+                    }
+
+                    // Skill point cost
+                    Label #SkillPointCost {
+                        Anchor: (Top: 152, Left: 8, Right: 0, Height: 16);
+                        Style: @RequirementMetStyle;
+                        Text: "1 Skill Point";
+                    }
+
+                    // Prerequisites
+                    Label #Prerequisites {
+                        Anchor: (Top: 170, Left: 8, Right: 0, Height: 16);
+                        Style: @RequirementMetStyle;
+                        Text: "None";
+                    }
+
+                    // Separator
+                    Group #DetailsSeparator3 {
+                        Anchor: (Top: 192, Left: 0, Right: 0, Height: 1);
+                        Background: #333344;
+                    }
+
+                    // Costs section (for active skills)
+                    Group #CostsSection {
+                        Anchor: (Top: 198, Left: 0, Right: 0, Height: 60);
+
+                        Label #CostsHeader {
+                            Anchor: (Top: 0, Left: 0, Right: 0, Height: 18);
+                            Style: @DetailsLabelStyle;
+                            Text: "Costs:";
+                        }
+
+                        // Mana cost
+                        Group #ManaCostRow {
+                            Anchor: (Top: 20, Left: 0, Right: 0, Height: 16);
+
+                            Label #ManaCostLabel {
+                                Anchor: (Left: 8, Top: 0, Width: 80, Bottom: 0);
+                                Style: @DetailsLabelStyle;
+                                Text: "Mana:";
+                            }
+
+                            Label #ManaCostValue {
+                                Anchor: (Right: 0, Top: 0, Width: 60, Bottom: 0);
+                                Style: @DetailsValueStyle;
+                                Text: "0";
+                            }
+                        }
+
+                        // Stamina cost
+                        Group #StaminaCostRow {
+                            Anchor: (Top: 38, Left: 0, Right: 0, Height: 16);
+
+                            Label #StaminaCostLabel {
+                                Anchor: (Left: 8, Top: 0, Width: 80, Bottom: 0);
+                                Style: @DetailsLabelStyle;
+                                Text: "Stamina:";
+                            }
+
+                            Label #StaminaCostValue {
+                                Anchor: (Right: 0, Top: 0, Width: 60, Bottom: 0);
+                                Style: @DetailsValueStyle;
+                                Text: "0";
+                            }
+                        }
+                    }
+
+                    // Cooldown
+                    Group #CooldownRow {
+                        Anchor: (Top: 262, Left: 0, Right: 0, Height: 16);
+
+                        Label #CooldownLabel {
+                            Anchor: (Left: 0, Top: 0, Width: 80, Bottom: 0);
+                            Style: @DetailsLabelStyle;
+                            Text: "Cooldown:";
+                        }
+
+                        Label #CooldownValue {
+                            Anchor: (Right: 0, Top: 0, Width: 60, Bottom: 0);
+                            Style: @DetailsValueStyle;
+                            Text: "0s";
+                        }
+                    }
+
+                    // Unlock button
+                    Button #UnlockButton {
+                        Anchor: (Bottom: 0, Left: 0, Right: 0, Height: 36);
+                        Background: #224422;
+
+                        Label #UnlockButtonText {
+                            Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                            Style: @ButtonTextStyle;
+                            Text: "Unlock Skill";
+                        }
+                    }
+
+                    // Unlock button disabled state
+                    Button #UnlockButtonDisabled {
+                        Anchor: (Bottom: 0, Left: 0, Right: 0, Height: 36);
+                        Background: #222222;
+                        Visible: false;
+
+                        Label #UnlockButtonDisabledText {
+                            Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+                            Style: @ButtonDisabledStyle;
+                            Text: "Cannot Unlock";
+                        }
+                    }
+
+                    // Already unlocked indicator
+                    Label #AlreadyUnlocked {
+                        Anchor: (Bottom: 0, Left: 0, Right: 0, Height: 36);
+                        Style: @UnlockedSkillStyle;
+                        Text: "Already Unlocked";
+                        Visible: false;
+                    }
+                }
+            }
+        }
+    }
+}

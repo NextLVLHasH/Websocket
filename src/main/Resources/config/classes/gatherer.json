@@ -1,0 +1,46 @@
+{
+  "id": "gatherer",
+  "display_name": "Gatherer",
+  "description": "Nature-attuned specialists who excel at farming, foraging, and harvesting resources.",
+  "icon_path": "ui/icons/class_gatherer.png",
+  "base_attributes": {
+    "STRENGTH": 10,
+    "DEXTERITY": 12,
+    "CONSTITUTION": 11,
+    "INTELLIGENCE": 11,
+    "WISDOM": 14,
+    "CHARISMA": 10
+  },
+  "attribute_growth": {
+    "STRENGTH": 1.0,
+    "DEXTERITY": 1.4,
+    "CONSTITUTION": 1.2,
+    "INTELLIGENCE": 1.2,
+    "WISDOM": 1.8,
+    "CHARISMA": 1.0
+  },
+  "starting_skills": ["gatherer_harvest_touch"],
+  "base_health": 85.0,
+  "base_mana": 80.0,
+  "base_stamina": 110.0,
+  "health_per_level": 7.0,
+  "mana_per_level": 7.0,
+  "stamina_per_level": 9.0,
+  "health_regen": 1.5,
+  "mana_regen": 2.5,
+  "stamina_regen": 5.5,
+  "equipment_rules": {
+    "allowed_armor_types": ["CLOTH", "LIGHT", "MEDIUM"],
+    "allowed_weapon_types": ["SICKLE", "STAFF", "DAGGER", "BOW"],
+    "main_stat": "WISDOM"
+  },
+  "modifiers": {
+    "physicalDamage": 0.85,
+    "magicalDamage": 1.0,
+    "criticalChance": 0.05,
+    "criticalDamage": 1.5,
+    "gatherSpeed": 0.25,
+    "cropYield": 0.20,
+    "rareResourceChance": 0.15
+  }
+}

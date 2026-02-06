@@ -1,0 +1,162 @@
+// Level Up Notification UI
+// Shows when a player levels up with stat gains
+
+@TitleStyle = LabelStyle(
+    FontSize: 24,
+    TextColor: #FFD700,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@LevelTextStyle = LabelStyle(
+    FontSize: 20,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@StatLabelStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #AAAAAA,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+@HealthGainStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #55FF55,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@ManaGainStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #FFFF55,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@StaminaGainStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #55FFFF,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@SkillPointsStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #FF55FF,
+    HorizontalAlignment: End,
+    VerticalAlignment: Center
+);
+
+@BorderStyle = LabelStyle(
+    FontSize: 16,
+    TextColor: #FFD700,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+Group {
+    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+    LayoutMode: Center;
+
+    Group #NotificationContainer {
+        Anchor: (Width: 300, Height: 180);
+        Background: #1a1a2e(0.9);
+
+        // Top border decoration
+        Group #TopBorder {
+            Anchor: (Top: 0, Left: 0, Right: 0, Height: 3);
+            Background: #FFD700;
+        }
+
+        // Bottom border decoration
+        Group #BottomBorder {
+            Anchor: (Bottom: 0, Left: 0, Right: 0, Height: 3);
+            Background: #FFD700;
+        }
+
+        Group #ContentArea {
+            Anchor: (Left: 16, Top: 12, Right: 16, Bottom: 12);
+
+            // Star icon and title row
+            Label #TitleLabel {
+                Anchor: (Top: 0, Left: 0, Right: 0, Height: 32);
+                Style: @TitleStyle;
+                Text: "LEVEL UP!";
+            }
+
+            // Level number display
+            Label #LevelText {
+                Anchor: (Top: 36, Left: 0, Right: 0, Height: 28);
+                Style: @LevelTextStyle;
+                Text: "Level 1";
+            }
+
+            // Separator line
+            Group #Separator {
+                Anchor: (Top: 68, Left: 20, Right: 20, Height: 1);
+                Background: #444444;
+            }
+
+            // Stats container
+            Group #StatsContainer {
+                Anchor: (Top: 76, Left: 0, Right: 0, Bottom: 8);
+
+                // Health gain row
+                Label #HealthLabel {
+                    Anchor: (Top: 0, Left: 0, Width: 120, Height: 20);
+                    Style: @StatLabelStyle;
+                    Text: "Health:";
+                }
+
+                Label #HealthGain {
+                    Anchor: (Top: 0, Right: 0, Width: 100, Height: 20);
+                    Style: @HealthGainStyle;
+                    Text: "+0";
+                }
+
+                // Mana gain row
+                Label #ManaLabel {
+                    Anchor: (Top: 22, Left: 0, Width: 120, Height: 20);
+                    Style: @StatLabelStyle;
+                    Text: "Mana:";
+                }
+
+                Label #ManaGain {
+                    Anchor: (Top: 22, Right: 0, Width: 100, Height: 20);
+                    Style: @ManaGainStyle;
+                    Text: "+0";
+                }
+
+                // Stamina gain row
+                Label #StaminaLabel {
+                    Anchor: (Top: 44, Left: 0, Width: 120, Height: 20);
+                    Style: @StatLabelStyle;
+                    Text: "Stamina:";
+                }
+
+                Label #StaminaGain {
+                    Anchor: (Top: 44, Right: 0, Width: 100, Height: 20);
+                    Style: @StaminaGainStyle;
+                    Text: "+0";
+                }
+
+                // Skill points row
+                Label #SkillPointsLabel {
+                    Anchor: (Top: 66, Left: 0, Width: 120, Height: 20);
+                    Style: @StatLabelStyle;
+                    Text: "Skill Points:";
+                }
+
+                Label #SkillPointsGain {
+                    Anchor: (Top: 66, Right: 0, Width: 100, Height: 20);
+                    Style: @SkillPointsStyle;
+                    Text: "+0";
+                }
+            }
+        }
+    }
+}

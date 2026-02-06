@@ -1,0 +1,352 @@
+// Character Creation / Selection UI
+
+@TitleStyle = LabelStyle(
+    FontSize: 24,
+    TextColor: #FFD700,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@SectionTitle = LabelStyle(
+    FontSize: 16,
+    TextColor: #FFD700,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center,
+    RenderBold: true
+);
+
+@LabelStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #CCCCCC,
+    HorizontalAlignment: Start,
+    VerticalAlignment: Center
+);
+
+@ValueStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #FFFFFF,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@ButtonLabelStyle = LabelStyle(
+    FontSize: 14,
+    TextColor: #FFFFFF,
+    RenderBold: true,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@SelectedButtonLabel = LabelStyle(
+    FontSize: 14,
+    TextColor: #FFD700,
+    RenderBold: true,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Center
+);
+
+@DescriptionStyle = LabelStyle(
+    FontSize: 12,
+    TextColor: #AAAAAA,
+    HorizontalAlignment: Center,
+    VerticalAlignment: Start
+);
+
+Group {
+    Anchor: (Left: 0, Top: 0, Right: 0, Bottom: 0);
+    LayoutMode: Center;
+
+    Group #MainContainer {
+        Anchor: (Width: 500, Height: 520);
+        Background: #0b0f14(0.95);
+
+        Group #Content {
+            Anchor: (Left: 20, Top: 20, Right: 20, Bottom: 20);
+
+            // Title
+            Label #Title {
+                Anchor: (Top: 0, Left: 0, Right: 0, Height: 36);
+                Style: @TitleStyle;
+                Text: "Character Creation";
+            }
+
+            // ================================
+            // Class Selection Section
+            // ================================
+            Group #ClassSection {
+                Anchor: (Top: 50, Left: 0, Right: 0, Height: 100);
+
+                Label #ClassSectionTitle {
+                    Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
+                    Style: @SectionTitle;
+                    Text: "Select Class";
+                }
+
+                // Class Buttons Row
+                Group #ClassButtons {
+                    Anchor: (Top: 28, Left: 0, Right: 0, Height: 36);
+
+                    Button #ClassWarrior {
+                        Anchor: (Top: 0, Left: 0, Width: 140, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #ClassWarriorLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Warrior";
+                        }
+                    }
+
+                    Button #ClassMage {
+                        Anchor: (Top: 0, Left: 155, Width: 140, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #ClassMageLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Mage";
+                        }
+                    }
+
+                    Button #ClassRogue {
+                        Anchor: (Top: 0, Right: 0, Width: 140, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #ClassRogueLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Rogue";
+                        }
+                    }
+                }
+
+                // Class Description
+                Label #ClassDescription {
+                    Anchor: (Top: 68, Left: 0, Right: 0, Height: 28);
+                    Style: @DescriptionStyle;
+                    Text: "Click a class to select";
+                }
+            }
+
+            // Separator
+            Group #Separator1 {
+                Anchor: (Top: 155, Left: 20, Right: 20, Height: 1);
+                Background: #3a3a3a;
+            }
+
+            // ================================
+            // Race Selection Section
+            // ================================
+            Group #RaceSection {
+                Anchor: (Top: 165, Left: 0, Right: 0, Height: 100);
+
+                Label #RaceSectionTitle {
+                    Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
+                    Style: @SectionTitle;
+                    Text: "Select Race";
+                }
+
+                // Race Buttons Row
+                Group #RaceButtons {
+                    Anchor: (Top: 28, Left: 0, Right: 0, Height: 36);
+
+                    Button #RaceHuman {
+                        Anchor: (Top: 0, Left: 0, Width: 105, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #RaceHumanLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Human";
+                        }
+                    }
+
+                    Button #RaceElf {
+                        Anchor: (Top: 0, Left: 115, Width: 105, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #RaceElfLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Elf";
+                        }
+                    }
+
+                    Button #RaceDwarf {
+                        Anchor: (Top: 0, Left: 230, Width: 105, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #RaceDwarfLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Dwarf";
+                        }
+                    }
+
+                    Button #RaceOrc {
+                        Anchor: (Top: 0, Right: 0, Width: 105, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #RaceOrcLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Orc";
+                        }
+                    }
+                }
+
+                // Race Description
+                Label #RaceDescription {
+                    Anchor: (Top: 68, Left: 0, Right: 0, Height: 28);
+                    Style: @DescriptionStyle;
+                    Text: "Click a race to select";
+                }
+            }
+
+            // Separator
+            Group #Separator2 {
+                Anchor: (Top: 270, Left: 20, Right: 20, Height: 1);
+                Background: #3a3a3a;
+            }
+
+            // ================================
+            // Profession Selection Section
+            // ================================
+            Group #ProfessionSection {
+                Anchor: (Top: 280, Left: 0, Right: 0, Height: 100);
+
+                Label #ProfessionSectionTitle {
+                    Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
+                    Style: @SectionTitle;
+                    Text: "Select Profession (Optional)";
+                }
+
+                // Profession Buttons Row
+                Group #ProfessionButtons {
+                    Anchor: (Top: 28, Left: 0, Right: 0, Height: 36);
+
+                    Button #ProfessionNone {
+                        Anchor: (Top: 0, Left: 0, Width: 105, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #ProfessionNoneLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "None";
+                        }
+                    }
+
+                    Button #ProfessionBlacksmith {
+                        Anchor: (Top: 0, Left: 115, Width: 105, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #ProfessionBlacksmithLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Blacksmith";
+                        }
+                    }
+
+                    Button #ProfessionAlchemist {
+                        Anchor: (Top: 0, Left: 230, Width: 105, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #ProfessionAlchemistLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Alchemist";
+                        }
+                    }
+
+                    Button #ProfessionEnchanter {
+                        Anchor: (Top: 0, Right: 0, Width: 105, Height: 36);
+                        Background: #2a2a2a;
+
+                        Label #ProfessionEnchanterLabel {
+                            Anchor: (Full: 0);
+                            Style: @ButtonLabelStyle;
+                            Text: "Enchanter";
+                        }
+                    }
+                }
+
+                // Profession Description
+                Label #ProfessionDescription {
+                    Anchor: (Top: 68, Left: 0, Right: 0, Height: 28);
+                    Style: @DescriptionStyle;
+                    Text: "Professions provide crafting abilities";
+                }
+            }
+
+            // Separator
+            Group #Separator3 {
+                Anchor: (Top: 385, Left: 20, Right: 20, Height: 1);
+                Background: #3a3a3a;
+            }
+
+            // ================================
+            // Summary & Action Buttons
+            // ================================
+            Group #SummarySection {
+                Anchor: (Top: 395, Left: 0, Right: 0, Height: 40);
+
+                Label #SummaryLabel {
+                    Anchor: (Top: 0, Left: 0, Width: 80, Height: 20);
+                    Style: @LabelStyle;
+                    Text: "Selection:";
+                }
+
+                Label #SummaryValue {
+                    Anchor: (Top: 0, Left: 80, Right: 0, Height: 20);
+                    Style: @ValueStyle;
+                    Text: "None";
+                }
+
+                Label #ValidationMessage {
+                    Anchor: (Top: 22, Left: 0, Right: 0, Height: 18);
+                    Style: (FontSize: 11, TextColor: #FF6666, HorizontalAlignment: Center);
+                    Text: "";
+                }
+            }
+
+            // Action Buttons
+            Group #ActionButtons {
+                Anchor: (Bottom: 0, Left: 0, Right: 0, Height: 44);
+
+                Button #ResetButton {
+                    Anchor: (Left: 0, Top: 0, Width: 130, Height: 44);
+                    Background: #5a5a5a;
+
+                    Label {
+                        Anchor: (Full: 0);
+                        Style: @ButtonLabelStyle;
+                        Text: "RESET";
+                    }
+                }
+
+                Button #ConfirmButton {
+                    Anchor: (Left: 145, Top: 0, Width: 170, Height: 44);
+                    Background: #2a5a2a;
+
+                    Label #ConfirmButtonLabel {
+                        Anchor: (Full: 0);
+                        Style: @ButtonLabelStyle;
+                        Text: "CREATE CHARACTER";
+                    }
+                }
+
+                Button #CancelButton {
+                    Anchor: (Right: 0, Top: 0, Width: 130, Height: 44);
+                    Background: #5a2a2a;
+
+                    Label {
+                        Anchor: (Full: 0);
+                        Style: @ButtonLabelStyle;
+                        Text: "CANCEL";
+                    }
+                }
+            }
+        }
+    }
+}

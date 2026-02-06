@@ -1,0 +1,26 @@
+{
+  "id": "mage_frost_bolt",
+  "display_name": "Frost Bolt",
+  "description": "Launches a bolt of frost that slows the target.",
+  "icon_path": "ui/icons/skill_mage_2.png",
+  "type": "ACTIVE",
+  "target_type": "ENEMY",
+  "required_level": 3,
+  "prerequisite_skills": ["mage_fireball"],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 3000,
+  "mana_cost": 20.0,
+  "stamina_cost": 0.0,
+  "cast_time_millis": 500,
+  "range": 30.0,
+  "effect_data": {
+    "damage": 20.0,
+    "damage_type": "FROST",
+    "slow_percent": 0.3,
+    "slow_duration_ms": 3000
+  },
+  "scaling_attributes": {
+    "INTELLIGENCE": 1.3
+  }
+}

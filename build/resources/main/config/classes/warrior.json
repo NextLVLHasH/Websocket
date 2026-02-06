@@ -1,0 +1,45 @@
+{
+  "id": "warrior",
+  "display_name": "Warrior",
+  "description": "Masters of combat, warriors excel in close-quarters battle with heavy weapons and armor.",
+  "icon_path": "ui/icons/class_warrior.png",
+  "base_attributes": {
+    "STRENGTH": 14,
+    "DEXTERITY": 10,
+    "CONSTITUTION": 13,
+    "INTELLIGENCE": 8,
+    "WISDOM": 9,
+    "CHARISMA": 10
+  },
+  "attribute_growth": {
+    "STRENGTH": 2.0,
+    "DEXTERITY": 1.2,
+    "CONSTITUTION": 1.8,
+    "INTELLIGENCE": 0.8,
+    "WISDOM": 0.9,
+    "CHARISMA": 1.0
+  },
+  "starting_skills": ["warrior_power_strike"],
+  "base_health": 120.0,
+  "base_mana": 30.0,
+  "base_stamina": 100.0,
+  "health_per_level": 12.0,
+  "mana_per_level": 2.0,
+  "stamina_per_level": 8.0,
+  "health_regen": 2.0,
+  "mana_regen": 0.5,
+  "stamina_regen": 5.0,
+  "equipment_rules": {
+    "allowed_armor_types": ["LIGHT", "MEDIUM", "HEAVY"],
+    "allowed_weapon_types": ["SWORD", "AXE", "MACE", "SHIELD", "POLEARM"],
+    "main_stat": "STRENGTH"
+  },
+  "modifiers": {
+    "physicalDamage": 1.1,
+    "magicalDamage": 0.8,
+    "criticalChance": 0.05,
+    "criticalDamage": 1.5,
+    "blockChance": 0.1,
+    "armorBonus": 0.15
+  }
+}

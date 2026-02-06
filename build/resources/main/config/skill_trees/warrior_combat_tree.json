@@ -1,0 +1,74 @@
+{
+  "id": "warrior_combat_tree",
+  "display_name": "Combat Mastery",
+  "associated_class": "warrior",
+  "description": "A skill tree focusing on warrior combat abilities.",
+  "icon_path": "ui/icons/tree_warrior.png",
+  "root_skill_id": "warrior_power_strike",
+  "nodes": {
+    "warrior_power_strike": {
+      "skill": {
+        "id": "warrior_power_strike",
+        "display_name": "Power Strike",
+        "description": "A powerful melee attack that deals bonus damage.",
+        "icon_path": "ui/icons/skill_warrior_1.png",
+        "type": "ACTIVE",
+        "target_type": "ENEMY",
+        "required_level": 1,
+        "prerequisite_skills": [],
+        "skill_point_cost": 1,
+        "cooldown_millis": 5000,
+        "mana_cost": 10.0,
+        "stamina_cost": 15.0,
+        "cast_time_millis": 0,
+        "range": 3.0,
+        "effect_data": {
+          "damage_multiplier": 1.5,
+          "damage_type": "PHYSICAL"
+        },
+        "scaling_attributes": {
+          "STRENGTH": 1.2
+        }
+      },
+      "tier": 0,
+      "position": 0,
+      "x": 100,
+      "y": 50,
+      "child_nodes": ["warrior_shield_bash"],
+      "parent_nodes": []
+    },
+    "warrior_shield_bash": {
+      "skill": {
+        "id": "warrior_shield_bash",
+        "display_name": "Shield Bash",
+        "description": "Bash your target with a shield, stunning them briefly.",
+        "icon_path": "ui/icons/skill_warrior_2.png",
+        "type": "ACTIVE",
+        "target_type": "ENEMY",
+        "required_level": 3,
+        "prerequisite_skills": ["warrior_power_strike"],
+        "skill_point_cost": 1,
+        "cooldown_millis": 8000,
+        "mana_cost": 15.0,
+        "stamina_cost": 20.0,
+        "cast_time_millis": 0,
+        "range": 2.0,
+        "effect_data": {
+          "damage_multiplier": 0.8,
+          "damage_type": "PHYSICAL",
+          "stun_duration_ms": 1500
+        },
+        "scaling_attributes": {
+          "STRENGTH": 0.8,
+          "CONSTITUTION": 0.5
+        }
+      },
+      "tier": 1,
+      "position": 0,
+      "x": 100,
+      "y": 150,
+      "child_nodes": [],
+      "parent_nodes": ["warrior_power_strike"]
+    }
+  }
+}

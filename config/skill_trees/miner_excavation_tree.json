@@ -1,0 +1,74 @@
+{
+  "id": "miner_excavation_tree",
+  "display_name": "Excavation",
+  "associated_class": "miner",
+  "description": "A skill tree focusing on mining and ore detection.",
+  "icon_path": "ui/icons/tree_miner.png",
+  "root_skill_id": "miner_prospecting",
+  "nodes": {
+    "miner_prospecting": {
+      "skill": {
+        "id": "miner_prospecting",
+        "display_name": "Prospecting",
+        "description": "Sense nearby ore deposits for a short time.",
+        "icon_path": "ui/icons/skill_miner_1.png",
+        "type": "ACTIVE",
+        "target_type": "SELF",
+        "required_level": 1,
+        "prerequisite_skills": [],
+        "skill_point_cost": 1,
+        "cooldown_millis": 60000,
+        "mana_cost": 25.0,
+        "stamina_cost": 5.0,
+        "cast_time_millis": 1500,
+        "range": 0.0,
+        "effect_data": {
+          "detection_radius": 20.0,
+          "duration_ms": 30000,
+          "highlight_ores": true
+        },
+        "scaling_attributes": {
+          "WISDOM": 0.5
+        }
+      },
+      "tier": 0,
+      "position": 0,
+      "x": 100,
+      "y": 50,
+      "child_nodes": ["miner_earthquake"],
+      "parent_nodes": []
+    },
+    "miner_earthquake": {
+      "skill": {
+        "id": "miner_earthquake",
+        "display_name": "Earthquake",
+        "description": "Strike the ground to break nearby blocks instantly.",
+        "icon_path": "ui/icons/skill_miner_2.png",
+        "type": "ACTIVE",
+        "target_type": "GROUND",
+        "required_level": 5,
+        "prerequisite_skills": ["miner_prospecting"],
+        "skill_point_cost": 2,
+        "cooldown_millis": 45000,
+        "mana_cost": 40.0,
+        "stamina_cost": 30.0,
+        "cast_time_millis": 1000,
+        "range": 0.0,
+        "effect_data": {
+          "break_radius": 3.0,
+          "break_depth": 2,
+          "drops_items": true
+        },
+        "scaling_attributes": {
+          "STRENGTH": 0.8
+        }
+      },
+      "tier": 1,
+      "position": 0,
+      "x": 100,
+      "y": 150,
+      "child_nodes": [],
+      "parent_nodes": ["miner_prospecting"]
+    }
+  }
+}

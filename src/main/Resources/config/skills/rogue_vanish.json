@@ -1,0 +1,24 @@
+{
+  "id": "rogue_vanish",
+  "display_name": "Vanish",
+  "description": "Disappear into the shadows, becoming invisible briefly.",
+  "icon_path": "ui/icons/skill_rogue_2.png",
+  "type": "ACTIVE",
+  "target_type": "SELF",
+  "required_level": 3,
+  "prerequisite_skills": ["rogue_shadowstrike"],
+  "skill_point_cost": 1,
+  "required_permissions": [],
+  "cooldown_millis": 15000,
+  "mana_cost": 10.0,
+  "stamina_cost": 30.0,
+  "cast_time_millis": 0,
+  "range": 0.0,
+  "effect_data": {
+    "invisibility_duration_ms": 5000,
+    "break_on_attack": true
+  },
+  "scaling_attributes": {
+    "DEXTERITY": 0.5
+  }
+}
